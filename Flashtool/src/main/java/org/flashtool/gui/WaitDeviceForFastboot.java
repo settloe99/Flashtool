@@ -1,12 +1,15 @@
 package org.flashtool.gui;
 
-import org.eclipse.core.runtime.Status;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.swt.widgets.Dialog;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Shell;
 import org.flashtool.gui.tools.SearchFastbootJob;
+import org.flashtool.gui.tools.FastBootToolBoxJob;
+import org.flashtool.jna.adb.FastbootUtility;
 import org.flashtool.gui.tools.WidgetTask;
 
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +48,11 @@ public class WaitDeviceForFastboot extends Dialog {
 	 * @return the result
 	 */
 	public Object open() {
+		if (FastbootUtility.getDevices().hasMoreElements()) {
+			log.info("Fastboot device already connected");
+			return "OK";
+		}
+
 		createContents();
 		shlWaitForFastbootmode.open();
 		shlWaitForFastbootmode.layout();
@@ -57,15 +65,33 @@ public class WaitDeviceForFastboot extends Dialog {
 		Display display = getParent().getDisplay();
 		job = new SearchFastbootJob("Search Fastboot Job");
 		job.schedule();
+		display.timerExec(250, new Runnable() {
+			@Override
+			public void run() {
+				if (shlWaitForFastbootmode.isDisposed()) {
+					return;
+				}
+
+				IStatus completed = job.getResult();
+
+				if (completed != null &&
+						job.getState() == Job.NONE) {
+
+					result = completed.isOK() ? "OK" : "Canceled";
+					shlWaitForFastbootmode.dispose();
+
+				} else {
+					display.timerExec(250, this);
+				}
+			}
+		});
+
 		while (!shlWaitForFastbootmode.isDisposed()) {
 			if (!display.readAndDispatch()) {
 				display.sleep();
 			}
-			if (job.getState() == Status.OK) {
-				result = new String("OK");
-				shlWaitForFastbootmode.dispose();
-			}
 		}
+
 		return result;
 	}
 
@@ -160,6 +186,37 @@ public class WaitDeviceForFastboot extends Dialog {
 			}
 		});
 		btnCancel.setText("Cancel");
+
+		Button btnRebootAdb =
+				new Button(shlWaitForFastbootmode, SWT.NONE);
+
+		FormData fd_btnRebootAdb = new FormData();
+		fd_btnRebootAdb.right =
+				new FormAttachment(btnCancel, -10);
+		fd_btnRebootAdb.bottom =
+				new FormAttachment(100, -10);
+
+		btnRebootAdb.setLayoutData(fd_btnRebootAdb);
+		btnRebootAdb.setText("Reboot via ADB");
+
+		btnRebootAdb.addSelectionListener(
+				new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				btnRebootAdb.setEnabled(false);
+
+				log.info("Requesting fastboot reboot via ADB");
+
+				FastBootToolBoxJob rebootJob =
+						new FastBootToolBoxJob(
+							"Reboot fastboot via ADB");
+
+				rebootJob.setAction(
+						"doRebootFastbootViaAdb");
+
+				rebootJob.schedule();
+			}
+		});
 		
 		Composite composite2011 = new Composite(shlWaitForFastbootmode, SWT.NONE);
 		fd_composite2011GIF.left = new FormAttachment(0, 206);
