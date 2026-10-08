@@ -138,21 +138,115 @@ installDist.doLast() {
         if (os.contains("mac")) {
            def dist = "${buildDir}/install/${project.name}"
            ant.move(file: "$dist/lib", toFile: "$dist/FlashTool.app/Contents/MacOS/lib")
-           ant.symlink(resource: "$dist/FlashTool.app/Contents/MacOS/x10flasher_native/udev/libusbx-1.0.0.dylib", link: "$dist/FlashTool.app/Contents/MacOS/x10flasher_native/udev/libusbx-1.0.dylib")
+           def udevDir = file("$dist/FlashTool.app/Contents/MacOS/x10flasher_native/udev")
+           def libusbFile = new File(udevDir, "libusbx-1.0.0.dylib")
+           def libusbLink = new File(udevDir, "libusbx-1.0.dylib")
+
+           if (!libusbFile.isFile()) {
+               throw new GradleException("Bundled libusb not found: $libusbFile")
+           }
+
+           // Create a relative symbolic link so the application is relocatable.
+           java.nio.file.Files.deleteIfExists(libusbLink.toPath())
+           java.nio.file.Files.createSymbolicLink(
+               libusbLink.toPath(),
+               java.nio.file.Paths.get("libusbx-1.0.0.dylib")
+           )
+
+           // Give the bundled library a relocatable install name.
+           exec {
+               commandLine "install_name_tool",
+                   "-id",
+                   "@loader_path/libusbx-1.0.0.dylib",
+                   libusbFile.absolutePath
+           }
+
+           // Re-sign the modified ARM64 library for local testing.
+           // A public release will require proper application signing.
+           exec {
+               commandLine "codesign",
+                   "--force",
+                   "--sign",
+                   "-",
+                   "--timestamp=none",
+                   libusbFile.absolutePath
+           }
         }
 }
 
 task createDMG() {
-        doLast() {
-        if (os.contains("mac")) {
-           def inst = "${buildDir}/install/${project.name}/"
-           def dist = "${buildDir}/distributions/"
-           new File(dist).mkdirs()
-           def command="hdiutil create -fs HFS+ -srcfolder ${inst} -volname FlashTool ${dist}/${project.name}-${flashtoolVersion}-${os}.dmg"
-           println command
-           command.execute()
+    group = 'distribution'
+    description = 'Creates a standalone Apple Silicon DMG'
+
+    doLast {
+        if (!os.contains("mac") ||
+                !(arch in ["aarch64", "arm64"])) {
+            throw new GradleException(
+                "Apple Silicon DMG requires an ARM64 Mac")
         }
+
+        def appDir = file(
+            "$buildDir/install/${project.name}/FlashTool.app"
+        )
+
+        if (!appDir.isDirectory()) {
+            throw new GradleException(
+                "Application bundle not found: $appDir")
         }
+
+        def stagingDir = file("$buildDir/dmg-staging")
+        def stagedApp = new File(stagingDir, "FlashTool.app")
+        def applicationsLink = new File(stagingDir, "Applications")
+
+        def outputDir = file("$buildDir/distributions")
+        outputDir.mkdirs()
+
+        def outputFile = new File(
+            outputDir,
+            "Flashtool-${flashtoolVersion}-mac-arm64-preview1.dmg"
+        )
+
+        delete stagingDir
+        stagingDir.mkdirs()
+
+        try {
+            // Preserve executable permissions and symbolic links.
+            project.exec {
+                commandLine 'ditto',
+                    appDir.absolutePath,
+                    stagedApp.absolutePath
+            }
+
+            // Standard macOS drag-and-drop installation shortcut.
+            java.nio.file.Files.createSymbolicLink(
+                applicationsLink.toPath(),
+                java.nio.file.Paths.get("/Applications")
+            )
+
+            println "Creating Apple Silicon DMG..."
+
+            project.exec {
+                commandLine 'hdiutil',
+                    'create',
+                    '-fs', 'HFS+',
+                    '-volname', 'FlashTool',
+                    '-srcfolder', stagingDir.absolutePath,
+                    '-format', 'UDZO',
+                    '-ov',
+                    outputFile.absolutePath
+            }
+
+            if (!outputFile.isFile()) {
+                throw new GradleException(
+                    "DMG creation did not produce an output file")
+            }
+
+            println "DMG created: $outputFile"
+
+        } finally {
+            delete stagingDir
+        }
+    }
 }
 
 createDMG.dependsOn('installDist')
