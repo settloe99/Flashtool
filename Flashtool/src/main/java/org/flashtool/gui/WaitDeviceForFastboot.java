@@ -1,252 +1,218 @@
 package org.flashtool.gui;
 
-import org.eclipse.core.runtime.IStatus;
-import org.eclipse.core.runtime.jobs.Job;
-import org.eclipse.swt.widgets.Dialog;
-import org.eclipse.swt.widgets.Display;
-import org.eclipse.swt.widgets.Event;
-import org.eclipse.swt.widgets.Listener;
-import org.eclipse.swt.widgets.Shell;
-import org.flashtool.gui.tools.SearchFastbootJob;
-import org.flashtool.gui.tools.FastBootToolBoxJob;
-import org.flashtool.jna.adb.FastbootUtility;
-import org.flashtool.gui.tools.WidgetTask;
-
 import lombok.extern.slf4j.Slf4j;
 
-import org.eclipse.swt.widgets.Composite;
+import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
-import org.eclipse.swt.widgets.Label;
-import org.eclipse.swt.layout.GridLayout;
-import org.eclipse.swt.layout.FormLayout;
-import org.eclipse.swt.layout.FormData;
-import org.eclipse.swt.layout.FormAttachment;
+import org.eclipse.swt.graphics.Font;
+import org.eclipse.swt.graphics.FontData;
 import org.eclipse.swt.layout.GridData;
+import org.eclipse.swt.layout.GridLayout;
+import org.eclipse.swt.widgets.Button;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Dialog;
+import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Shell;
+import org.flashtool.gui.tools.FastBootToolBoxJob;
+import org.flashtool.gui.tools.SearchFastbootJob;
+import org.flashtool.jna.adb.FastbootUtility;
 
+/**
+ * Waits for a fastboot device, with manual connection guidance and the
+ * existing ADB-to-fastboot reboot action.
+ */
 @Slf4j
 public class WaitDeviceForFastboot extends Dialog {
 
-	protected Object result;
-	protected Shell shlWaitForFastbootmode;
-	protected SearchFastbootJob job;
-	
-	/**
-	 * Create the dialog.
-	 * @param parent
-	 * @param style
-	 */
-	public WaitDeviceForFastboot(Shell parent, int style) {
-		super(parent, style);
-		setText("Wait for Fastboot mode");
-	}
+    protected Object result;
+    protected Shell shlWaitForFastbootmode;
+    protected SearchFastbootJob job;
+    private Label statusLabel;
 
-	/**
-	 * Open the dialog.
-	 * @return the result
-	 */
-	public Object open() {
-		if (FastbootUtility.getDevices().hasMoreElements()) {
-			log.info("Fastboot device already connected");
-			return "OK";
-		}
+    public WaitDeviceForFastboot(Shell parent, int style) {
+        super(parent, style);
+        setText("Wait for Fastboot mode");
+    }
 
-		createContents();
-		shlWaitForFastbootmode.open();
-		shlWaitForFastbootmode.layout();
-		shlWaitForFastbootmode.addListener(SWT.Close, new Listener() {
-		      public void handleEvent(Event event) {
-					job.stopSearch();
-					result = new String("Canceled");
-		      }
-		    });
-		Display display = getParent().getDisplay();
-		job = new SearchFastbootJob("Search Fastboot Job");
-		job.schedule();
-		display.timerExec(250, new Runnable() {
-			@Override
-			public void run() {
-				if (shlWaitForFastbootmode.isDisposed()) {
-					return;
-				}
+    public Object open() {
+        // Preserve the tested fast path: do not show the dialog unnecessarily.
+        if (FastbootUtility.getDevices().hasMoreElements()) {
+            log.info("Fastboot device already connected");
+            return "OK";
+        }
 
-				IStatus completed = job.getResult();
+        result = "Canceled";
+        createContents();
+        Display display = getParent().getDisplay();
+        job = new SearchFastbootJob("Search Fastboot Job");
 
-				if (completed != null &&
-						job.getState() == Job.NONE) {
+        shlWaitForFastbootmode.addListener(SWT.Close, event -> {
+            job.stopSearch();
+            result = "Canceled";
+        });
 
-					result = completed.isOK() ? "OK" : "Canceled";
-					shlWaitForFastbootmode.dispose();
+        shlWaitForFastbootmode.open();
+        shlWaitForFastbootmode.layout();
+        job.schedule();
 
-				} else {
-					display.timerExec(250, this);
-				}
-			}
-		});
+        // Keep the existing non-blocking check and tested job-result semantics.
+        display.timerExec(250, new Runnable() {
+            @Override
+            public void run() {
+                if (shlWaitForFastbootmode.isDisposed()) {
+                    return;
+                }
 
-		while (!shlWaitForFastbootmode.isDisposed()) {
-			if (!display.readAndDispatch()) {
-				display.sleep();
-			}
-		}
+                IStatus completed = job.getResult();
+                if (completed != null && job.getState() == Job.NONE) {
+                    result = completed.isOK() ? "OK" : "Canceled";
+                    if (completed.isOK()) {
+                        log.info("Fastboot device detected");
+                    }
+                    shlWaitForFastbootmode.dispose();
+                } else {
+                    display.timerExec(250, this);
+                }
+            }
+        });
 
-		return result;
-	}
+        while (!shlWaitForFastbootmode.isDisposed()) {
+            if (!display.readAndDispatch()) {
+                display.sleep();
+            }
+        }
+        return result;
+    }
 
-	/**
-	 * Create contents of the dialog.
-	 */
-	private void createContents() {
-		shlWaitForFastbootmode = new Shell(getParent(), getStyle());
-		shlWaitForFastbootmode.setSize(500, 600);
-		shlWaitForFastbootmode.setText("Wait for Fastboot Mode");
-		shlWaitForFastbootmode.setLayout(new FormLayout());
-		
-		Composite composite2012 = new Composite(shlWaitForFastbootmode, SWT.NONE);
-		FormData fd_composite2012 = new FormData();
-		fd_composite2012.left = new FormAttachment(0, 10);
-		fd_composite2012.top = new FormAttachment(0, 77);
-		fd_composite2012.bottom = new FormAttachment(0, 202);
-		composite2012.setLayoutData(fd_composite2012);
-		composite2012.setLayout(new GridLayout(1, false));
-		
-		// 2012 Line Of Xperias Text
-		Label lblNewLabel00 = new Label(composite2012, SWT.NONE);
-		lblNewLabel00.setText("2012");
+    private void createContents() {
+        shlWaitForFastbootmode = new Shell(getParent(), getStyle());
+        shlWaitForFastbootmode.setText("Connect Xperia in Fastboot Mode");
 
-		Label lblNewLabel01 = new Label(composite2012, SWT.NONE);
-		lblNewLabel01.setText("1.  Unplug the device");
-		
-		Label lblNewLabel02 = new Label(composite2012, SWT.NONE);
-		lblNewLabel02.setText("2.  Power off the device");
-		
-		Label lblNewLabel03 = new Label(composite2012, SWT.NONE);
-		lblNewLabel03.setText("3.  Press the volume UP button");
+        GridLayout layout = new GridLayout(1, false);
+        layout.marginWidth = 24;
+        layout.marginHeight = 20;
+        layout.verticalSpacing = 10;
+        shlWaitForFastbootmode.setLayout(layout);
 
-		Label lblNewLabel05 = new Label(composite2012, SWT.NONE);
-		lblNewLabel05.setText("4.  Plug the USB cable");
-		
-		Label lblNewLabel_4 = new Label(composite2012, SWT.NONE);
-		lblNewLabel_4.setText("-Volume UP for Xperia Ray");
-		
-		Composite composite2012GIF = new Composite(shlWaitForFastbootmode, SWT.NONE);
-		fd_composite2012.right = new FormAttachment(composite2012GIF, -6);
-		FormData fd_composite2012GIF = new FormData();
-		fd_composite2012GIF.left = new FormAttachment(0, 206);
-		fd_composite2012GIF.right = new FormAttachment(100, -10);
-		fd_composite2012GIF.top = new FormAttachment(0, 10);
-		composite2012GIF.setLayoutData(fd_composite2012GIF);
-		composite2012GIF.setLayout(new FormLayout());
-		
-		final GifCLabel lbl = new GifCLabel(composite2012GIF, SWT.CENTER);
-		FormData fd_lbl = new FormData();
-		fd_lbl.top = new FormAttachment(0);
-		fd_lbl.left = new FormAttachment(0);
-		fd_lbl.right = new FormAttachment(100);
-		fd_lbl.bottom = new FormAttachment(0, 240);
-		lbl.setLayoutData(fd_lbl);
-		lbl.setText("");
-		lbl.setGifImage(this.getClass().getResourceAsStream("/gui/ressources/fastbootmode2012.gif"));
-		lbl.setLayout(new FormLayout());
+        // Reuse the platform font family, making only the headings bolder.
+        FontData[] headingData = shlWaitForFastbootmode.getFont().getFontData();
+        for (FontData data : headingData) {
+            data.setStyle(data.getStyle() | SWT.BOLD);
+        }
+        Font sectionFont = new Font(shlWaitForFastbootmode.getDisplay(), headingData);
 
-		Composite composite2011GIF = new Composite(shlWaitForFastbootmode, SWT.NONE);
-		fd_composite2012GIF.bottom = new FormAttachment(100, -321);
-		FormData fd_composite2011GIF = new FormData();
-		fd_composite2011GIF.right = new FormAttachment(100, -10);
-		fd_composite2011GIF.top = new FormAttachment(composite2012GIF, 6);
-		composite2011GIF.setLayoutData(fd_composite2011GIF);
-		composite2011GIF.setLayout(new FormLayout());
-		
-		final GifCLabel lbl2 = new GifCLabel(composite2011GIF, SWT.CENTER);
-		FormData fd_lbl2 = new FormData();
-		fd_lbl2.top = new FormAttachment(0);
-		fd_lbl2.left = new FormAttachment(0);
-		fd_lbl2.right = new FormAttachment(100);
-		fd_lbl2.bottom = new FormAttachment(0, 271);
-		lbl2.setLayoutData(fd_lbl2);
-		lbl2.setText("");
-		lbl2.setGifImage(this.getClass().getResourceAsStream("/gui/ressources/fastbootmode2011.gif"));
-		lbl2.setLayout(new FormLayout());
-		
-		
-		Button btnCancel = new Button(shlWaitForFastbootmode, SWT.NONE);
-		fd_composite2011GIF.bottom = new FormAttachment(btnCancel, -9);
-		FormData fd_btnCancel = new FormData();
-		fd_btnCancel.right = new FormAttachment(100,-10);
-		fd_btnCancel.bottom = new FormAttachment(100, -10);
-		btnCancel.setLayoutData(fd_btnCancel);
-		btnCancel.addSelectionListener(new SelectionAdapter() {
-			@Override
-			public void widgetSelected(SelectionEvent e) {
-				job.stopSearch();
-				result = new String("Canceled");
-				shlWaitForFastbootmode.dispose();
-			}
-		});
-		btnCancel.setText("Cancel");
+        FontData[] titleData = shlWaitForFastbootmode.getFont().getFontData();
+        for (FontData data : titleData) {
+            data.setStyle(data.getStyle() | SWT.BOLD);
+            data.setHeight(data.getHeight() + 3);
+        }
+        Font titleFont = new Font(shlWaitForFastbootmode.getDisplay(), titleData);
+        shlWaitForFastbootmode.addListener(SWT.Dispose, event -> {
+            titleFont.dispose();
+            sectionFont.dispose();
+        });
 
-		Button btnRebootAdb =
-				new Button(shlWaitForFastbootmode, SWT.NONE);
+        Label title = new Label(shlWaitForFastbootmode, SWT.NONE);
+        title.setText("Connect your Xperia");
+        title.setFont(titleFont);
+        title.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
 
-		FormData fd_btnRebootAdb = new FormData();
-		fd_btnRebootAdb.right =
-				new FormAttachment(btnCancel, -10);
-		fd_btnRebootAdb.bottom =
-				new FormAttachment(100, -10);
+        statusLabel = new Label(shlWaitForFastbootmode, SWT.WRAP);
+        statusLabel.setText("Status: Waiting for a Fastboot device...");
+        GridData statusData = new GridData(SWT.FILL, SWT.CENTER, true, false);
+        statusData.widthHint = 460;
+        statusLabel.setLayoutData(statusData);
 
-		btnRebootAdb.setLayoutData(fd_btnRebootAdb);
-		btnRebootAdb.setText("Reboot via ADB");
+        addSeparator();
 
-		btnRebootAdb.addSelectionListener(
-				new SelectionAdapter() {
-			@Override
-			public void widgetSelected(SelectionEvent e) {
-				btnRebootAdb.setEnabled(false);
+        Label automaticTitle = new Label(shlWaitForFastbootmode, SWT.NONE);
+        automaticTitle.setText("Connect automatically");
+        automaticTitle.setFont(sectionFont);
 
-				log.info("Requesting fastboot reboot via ADB");
+        Label adbInstructions = new Label(shlWaitForFastbootmode, SWT.WRAP);
+        adbInstructions.setText(
+                "If Android is running with USB debugging enabled, Flashtool "
+                + "can restart your phone in Fastboot mode.");
+        GridData adbData = new GridData(SWT.FILL, SWT.CENTER, true, false);
+        adbData.widthHint = 460;
+        adbInstructions.setLayoutData(adbData);
 
-				FastBootToolBoxJob rebootJob =
-						new FastBootToolBoxJob(
-							"Reboot fastboot via ADB");
+        Button btnRebootAdb = new Button(shlWaitForFastbootmode, SWT.PUSH);
+        btnRebootAdb.setText("Reboot via ADB");
+        btnRebootAdb.setLayoutData(new GridData(SWT.BEGINNING, SWT.CENTER, false, false));
+        btnRebootAdb.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                btnRebootAdb.setEnabled(false);
+                statusLabel.setText("Status: Requesting Fastboot reboot via ADB...");
+                shlWaitForFastbootmode.layout(true, true);
+                log.info("Requesting fastboot reboot via ADB");
 
-				rebootJob.setAction(
-						"doRebootFastbootViaAdb");
+                FastBootToolBoxJob rebootJob =
+                        new FastBootToolBoxJob("Reboot fastboot via ADB");
+                rebootJob.setAction("doRebootFastbootViaAdb");
+                rebootJob.schedule();
+            }
+        });
 
-				rebootJob.schedule();
-			}
-		});
-		
-		Composite composite2011 = new Composite(shlWaitForFastbootmode, SWT.NONE);
-		fd_composite2011GIF.left = new FormAttachment(0, 206);
-		FormData fd_composite2011 = new FormData();
-		fd_composite2011.bottom = new FormAttachment(100, -141);
-		fd_composite2011.top = new FormAttachment(composite2012, 123);
-		fd_composite2011.right = new FormAttachment(composite2011GIF, -6);
-		fd_composite2011.left = new FormAttachment(0, 10);
-		composite2011.setLayoutData(fd_composite2011);
-		composite2011.setLayout(new GridLayout(1, false));
-		
-		
-		// Xperia 2011 Lines of Xperia Text
-		Label lblNewLabel = new Label(composite2011, SWT.NONE);
-		GridData gd_lblNewLabel = new GridData(SWT.LEFT, SWT.CENTER, false, false, 1, 1);
-		gd_lblNewLabel.widthHint = 186;
-		lblNewLabel.setLayoutData(gd_lblNewLabel);
-		lblNewLabel.setText("2011");
-		
-		Label lblNewLabel_1 = new Label(composite2011, SWT.NONE);
-		lblNewLabel_1.setText("1.  Unplug the device");
-		
-		Label lblNewLabel_2 = new Label(composite2011, SWT.NONE);
-		lblNewLabel_2.setText("2.  Power off the device");
-		
-		Label lblNewLabel_3 = new Label(composite2011, SWT.NONE);
-		lblNewLabel_3.setText("3.  Press the menu button-");
-		
-		Label lblNewLabel_5 = new Label(composite2011, SWT.NONE);
-		lblNewLabel_5.setText("4.  Plug the USB cable");
-	}
+        addSeparator();
+
+        Label manualTitle = new Label(shlWaitForFastbootmode, SWT.NONE);
+        manualTitle.setText("Connect manually");
+        manualTitle.setFont(sectionFont);
+
+        Label manualInstructions = new Label(shlWaitForFastbootmode, SWT.WRAP);
+        manualInstructions.setText(
+                "1. Disconnect USB and turn off the phone.\n"
+                + "2. On most Xperia models, hold Volume Up while connecting USB.\n"
+                + "3. Release when the notification LED turns blue.");
+        GridData manualData = new GridData(SWT.FILL, SWT.CENTER, true, false);
+        manualData.widthHint = 460;
+        manualInstructions.setLayoutData(manualData);
+
+        Label olderPhones = new Label(shlWaitForFastbootmode, SWT.WRAP);
+        olderPhones.setText(
+                "Some older Xperia models use a different button (for example, "
+                + "Menu on certain 2011 models). Check your model's instructions "
+                + "if Volume Up doesn't work.");
+        GridData olderData = new GridData(SWT.FILL, SWT.CENTER, true, false);
+        olderData.widthHint = 460;
+        olderPhones.setLayoutData(olderData);
+
+        addSeparator();
+
+        Composite footer = new Composite(shlWaitForFastbootmode, SWT.NONE);
+        GridLayout footerLayout = new GridLayout(1, false);
+        footerLayout.marginWidth = 0;
+        footerLayout.marginHeight = 0;
+        footer.setLayout(footerLayout);
+        footer.setLayoutData(new GridData(SWT.END, SWT.CENTER, true, false));
+
+        Button btnCancel = new Button(footer, SWT.PUSH);
+        btnCancel.setText("Cancel");
+        GridData cancelData = new GridData(SWT.FILL, SWT.CENTER, false, false);
+        cancelData.widthHint = 90;
+        btnCancel.setLayoutData(cancelData);
+        btnCancel.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                // SWT.Close keeps the tested background-search cancellation path.
+                shlWaitForFastbootmode.close();
+            }
+        });
+
+        shlWaitForFastbootmode.pack();
+        shlWaitForFastbootmode.setMinimumSize(shlWaitForFastbootmode.getSize());
+    }
+
+    private void addSeparator() {
+        Label separator = new Label(shlWaitForFastbootmode,
+                SWT.SEPARATOR | SWT.HORIZONTAL);
+        separator.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+    }
 
 }
