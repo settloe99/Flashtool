@@ -146,8 +146,10 @@ public class FastbootToolbox extends Dialog {
 		        dlg.setFilterExtensions(new String[]{"*.sin","*.elf","*.img"});
 		        dlg.setText("Kernel Chooser");
 		        String dir = dlg.open();
-		        if (dir!=null)
-		        	doHotBoot(dir);
+		        if (dir != null) {
+		            shlFastbootToolbox.dispose();
+		            doHotBoot(dir);
+		        }
 			} else {
 				log.info("Failed");
 			}
@@ -167,8 +169,10 @@ public class FastbootToolbox extends Dialog {
 		        dlg.setFilterExtensions(new String[]{"*.sin","*.img","*.ext4","*.yaffs2"});
 		        dlg.setText("System Chooser");
 		        String dir = dlg.open();
-		        if (dir!=null)
-		        	doFlashSystem(dir);
+		        if (dir != null) {
+		            shlFastbootToolbox.dispose();
+		            doFlashSystem(dir);
+		        }
 			}
 			else {
 				log.info("Failed");
@@ -189,8 +193,10 @@ public class FastbootToolbox extends Dialog {
 		        dlg.setFilterExtensions(new String[]{"*.sin","*.elf","*.img"});
 		        dlg.setText("Kernel Chooser");
 		        String dir = dlg.open();
-		        if (dir!=null)
-		        	doFlashKernel(dir);
+		        if (dir != null) {
+		            shlFastbootToolbox.dispose();
+		            doFlashKernel(dir);
+		        }
 			}
 			else {
 				log.info("Failed");
