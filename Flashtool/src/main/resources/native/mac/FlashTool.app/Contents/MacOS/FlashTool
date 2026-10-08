@@ -61,6 +61,8 @@ export os_name=$(uname -s)
 
 setworkingdir
 
+cd "$working_dir" || exit 1
+
 CLASSPATH=$(find $working_dir -name '*.jar'|xargs|tr ' ' ':')
 
 export JAVA_HOME=$working_dir/jre
