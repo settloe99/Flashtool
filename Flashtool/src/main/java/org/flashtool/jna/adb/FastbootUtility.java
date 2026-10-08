@@ -36,14 +36,35 @@ public class FastbootUtility {
 		return v.elements();
 	}
 
+    private static RunOutputs checkedBootResult(
+            ProcessBuilderWrapper process, String operation)
+            throws java.io.IOException {
+
+        int exitCode = process.getStatus();
+
+        if (exitCode != 0) {
+            String details = process.getStdErr().trim();
+
+            if (details.isEmpty()) {
+                details = process.getStdOut().trim();
+            }
+
+            throw new java.io.IOException(
+                    operation + " failed (exit code " + exitCode + ")"
+                    + (details.isEmpty() ? "" : ": " + details));
+        }
+
+        return process.getOutputs();
+    }
+
 	public static RunOutputs hotBoot(String bootimg) throws Exception {
 		ProcessBuilderWrapper command = new ProcessBuilderWrapper(new String[] {fastbootpath,"boot", bootimg},false);
-		return command.getOutputs();
+		return checkedBootResult(command, "Fastboot boot");
 	}
 	
 	public static RunOutputs flashBoot(String bootimg) throws Exception {
 		ProcessBuilderWrapper pbd = new ProcessBuilderWrapper(new String[] {fastbootpath,"flash", "boot", bootimg},true);
-		return pbd.getOutputs();
+		return checkedBootResult(pbd, "Fastboot flash boot");
 	}
 
 	public static RunOutputs flashSystem(String systemimg) throws Exception {

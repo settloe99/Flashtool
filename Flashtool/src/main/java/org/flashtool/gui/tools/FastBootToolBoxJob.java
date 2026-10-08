@@ -5,6 +5,8 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.jobs.Job;
+import org.flashtool.binutils.boot.PreparedBootImage;
+import java.nio.file.Path;
 import org.flashtool.gui.TARestore;
 import org.flashtool.jna.adb.AdbUtility;
 import org.flashtool.jna.adb.FastbootUtility;
@@ -165,7 +167,16 @@ public class FastBootToolBoxJob extends Job {
 			// this wont wait for reply and will move on to next command
 			log.info("HotBooting selected kernel");
 			try {
-				RunOutputs outputsRun = FastbootUtility.hotBoot(_image);
+				RunOutputs outputsRun;
+
+                try (PreparedBootImage prepared =
+                        PreparedBootImage.from(Path.of(_image))) {
+
+                    log.info("Prepared boot image: " + prepared.path());
+
+                    outputsRun = FastbootUtility.hotBoot(
+                            prepared.path().toString());
+                }
 				log.info("FASTBOOT Output: \n " + outputsRun.getStdErr().trim() + "\n");
 				if (!outputsRun.getStdErr().trim().contains("FAILED"))
 					log.info("Device should now start booting with this kernel");
@@ -189,7 +200,16 @@ public class FastBootToolBoxJob extends Job {
 			log.info("Selected kernel (boot.img or kernel.sin): " + _image);
 			log.info("Flashing selected kernel");
 			try {
-				RunOutputs outputsRun = FastbootUtility.flashBoot(_image);
+				RunOutputs outputsRun;
+
+                try (PreparedBootImage prepared =
+                        PreparedBootImage.from(Path.of(_image))) {
+
+                    log.info("Prepared boot image: " + prepared.path());
+
+                    outputsRun = FastbootUtility.flashBoot(
+                            prepared.path().toString());
+                }
 				log.info("FASTBOOT Output: \n " + outputsRun.getStdErr().trim() + "\n");
 				log.info("Please check the log before rebooting into system");
 			}
