@@ -174,6 +174,208 @@ installDist.doLast() {
         }
 }
 
+
+// Compile native Apple Silicon launcher after assembling the application.
+installDist.doLast {
+    if (os.contains("mac") && arch in ["aarch64", "arm64"]) {
+
+        println "Compile native Apple Silicon launcher"
+
+        def sourceFile = file(
+            "src/main/native/mac/FlashToolLauncher.m"
+        )
+
+        def executable = file(
+            "$buildDir/install/${project.name}/FlashTool.app/Contents/MacOS/FlashTool"
+        )
+
+        if (!sourceFile.isFile()) {
+            throw new GradleException(
+                "Native launcher source not found: $sourceFile"
+            )
+        }
+
+        project.exec {
+            commandLine "xcrun", "clang",
+                "-arch", "arm64",
+                "-mmacosx-version-min=11.0",
+                "-fobjc-arc",
+                "-framework", "Foundation",
+                sourceFile.absolutePath,
+                "-o", executable.absolutePath
+        }
+
+        println "Native launcher created: $executable"
+    }
+}
+
+
+// Package and ad-hoc sign Apple Silicon application.
+// Runs after the existing installDist actions have assembled the
+// application and compiled its native launcher.
+installDist.doLast {
+    if (os.contains("mac") && arch in ["aarch64", "arm64"]) {
+
+        def appDir = file(
+            "$buildDir/install/${project.name}/FlashTool.app"
+        )
+
+        def contents = new File(appDir, "Contents")
+        def macDir = new File(contents, "MacOS")
+        def dataDir = new File(contents, "Resources/Flashtool")
+        def javaHome = new File(contents, "runtime/Contents/Home")
+
+        println "Preparing standalone Apple Silicon application..."
+
+        // Reproduce the application layout validated manually.
+        def relocations = [
+            [
+                source: new File(macDir, "jre"),
+                target: javaHome
+            ],
+            [
+                source: new File(macDir, "lib"),
+                target: new File(dataDir, "lib")
+            ],
+            [
+                source: new File(macDir, "custom"),
+                target: new File(dataDir, "custom")
+            ],
+            [
+                source: new File(macDir, "x10flasher_native"),
+                target: new File(dataDir, "x10flasher_native")
+            ]
+        ]
+
+        // Validate everything before moving any directories.
+        relocations.each { entry ->
+            if (!entry.source.isDirectory()) {
+                throw new GradleException(
+                    "Missing application directory: ${entry.source}"
+                )
+            }
+
+            if (entry.target.exists()) {
+                throw new GradleException(
+                    "Destination already exists: ${entry.target}"
+                )
+            }
+        }
+
+        relocations.each { entry ->
+            entry.target.parentFile.mkdirs()
+
+            java.nio.file.Files.move(
+                entry.source.toPath(),
+                entry.target.toPath()
+            )
+        }
+
+        def launcher = new File(macDir, "FlashTool")
+        def javaExecutable = new File(javaHome, "bin/java")
+
+        if (!launcher.isFile() || !javaExecutable.isFile()) {
+            throw new GradleException(
+                "Native launcher or bundled Java is missing"
+            )
+        }
+
+        // Confirm that the libusb link remains relocatable.
+        def libusbLink = new File(
+            dataDir,
+            "x10flasher_native/udev/libusbx-1.0.dylib"
+        )
+
+        if (!java.nio.file.Files.isSymbolicLink(
+                libusbLink.toPath())) {
+            throw new GradleException(
+                "Bundled libusb symbolic link is missing"
+            )
+        }
+
+        def linkTarget = java.nio.file.Files.readSymbolicLink(
+            libusbLink.toPath()
+        ).toString()
+
+        if (linkTarget != "libusbx-1.0.0.dylib") {
+            throw new GradleException(
+                "Bundled libusb link is not relative: $linkTarget"
+            )
+        }
+
+        // Remove problematic metadata from the assembled copy only.
+        project.exec {
+            commandLine "xattr", "-cr", appDir.absolutePath
+        }
+
+        println "Signing embedded native components..."
+
+        int signed = 0
+
+        fileTree(appDir).files.sort {
+            it.absolutePath
+        }.each { nativeFile ->
+
+            if (nativeFile.isFile() &&
+                !java.nio.file.Files.isSymbolicLink(
+                    nativeFile.toPath()) &&
+                nativeFile.absolutePath != launcher.absolutePath) {
+
+                def fileInfo = new java.io.ByteArrayOutputStream()
+
+                project.exec {
+                    commandLine "file", "-b",
+                        nativeFile.absolutePath
+                    standardOutput = fileInfo
+                }
+
+                if (fileInfo.toString("UTF-8").contains("Mach-O")) {
+                    project.exec {
+                        commandLine "codesign",
+                            "--force",
+                            "--sign", "-",
+                            "--timestamp=none",
+                            nativeFile.absolutePath
+                    }
+
+                    signed++
+                }
+            }
+        }
+
+        if (signed == 0) {
+            throw new GradleException(
+                "No embedded native components were signed"
+            )
+        }
+
+        println "Signed $signed embedded native components."
+
+        // Sign the complete bundle, including its main launcher.
+        println "Signing FlashTool.app..."
+
+        project.exec {
+            commandLine "codesign",
+                "--force",
+                "--sign", "-",
+                "--timestamp=none",
+                appDir.absolutePath
+        }
+
+        // Fail the build if the signature is invalid.
+        project.exec {
+            commandLine "codesign",
+                "--verify",
+                "--deep",
+                "--strict",
+                "--verbose=2",
+                appDir.absolutePath
+        }
+
+        println "Apple Silicon application signing verified."
+    }
+}
+
 task createDMG() {
     group = 'distribution'
     description = 'Creates a standalone Apple Silicon DMG'
