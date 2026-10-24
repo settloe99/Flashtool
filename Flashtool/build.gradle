@@ -519,3 +519,9 @@ installDist.doFirst {
         }
     }
 }
+
+
+// Lock resolved dependency versions for repeatable builds.
+dependencyLocking {
+    lockAllConfigurations()
+}
