@@ -134,9 +134,14 @@ distributions {
 
 [createInstaller]*.dependsOn('installDist')
 
+apply from: 'gradle/mac-arm64-native.gradle'
+
 installDist.doLast() {
         if (os.contains("mac")) {
            def dist = "${buildDir}/install/${project.name}"
+           if (arch in ['arm64', 'aarch64']) {
+               project.ext.stagePinnedMacArm64Native.call(file("$dist/FlashTool.app/Contents/MacOS/x10flasher_native"))
+           }
            ant.move(file: "$dist/lib", toFile: "$dist/FlashTool.app/Contents/MacOS/lib")
            def udevDir = file("$dist/FlashTool.app/Contents/MacOS/x10flasher_native/udev")
            def libusbFile = new File(udevDir, "libusbx-1.0.0.dylib")
@@ -405,7 +410,7 @@ task createDMG() {
 
         def outputFile = new File(
             outputDir,
-            "Flashtool-${flashtoolVersion}-mac-arm64-preview1.dmg"
+            "Flashtool-${flashtoolVersion}-mac-arm64-preview2.dmg"
         )
 
         delete stagingDir
@@ -496,6 +501,21 @@ testing {
         test {
             // Use TestNG test framework
             useTestNG('7.4.0')
+        }
+    }
+}
+
+
+// Clean previous assembled Apple Silicon installation.
+// The packaging task relocates files after installDist, so
+// Gradle cannot reuse the previous installation directory.
+// This does not affect source files or generated DMGs.
+installDist.doFirst {
+    if (os == 'mac' && arch in ['aarch64', 'arm64']) {
+        def previousInstall = file("$buildDir/install/${project.name}")
+        if (previousInstall.exists()) {
+            logger.lifecycle("Removing previous assembled installation")
+            project.delete(previousInstall)
         }
     }
 }

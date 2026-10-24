@@ -1,0 +1,49 @@
+// Pinned native inputs for the unofficial Apple Silicon Flashtool build.
+// Builder-only cache. Nothing here is fetched from an unpinned URL or Homebrew
+// at build time, and nothing is installed on the end user's machine.
+ext.stagePinnedMacArm64Native = { File nativeRoot ->
+    File cache = new File(System.getProperty('user.home'), '.cache/flashtool/mac-arm64')
+
+    // SHA-256 of the four source files tested in preview1 (before signing/patching libusb).
+    Map<String, String> locked = [
+        'adb'                         : '1811e253b21b12cbfda7201ebaf86c10e7ddcb5c606a7a81f7c82b4c429c2d3b',
+        'fastboot'                    : 'c97aa28970ba9a46023a8ca52a78dd6547c2c1c4133f9715d4fe551e1dfae152',
+        'unyaffs'                     : '2fbbc14dc68350f7d7a16959252878ba07a0f6f547ce253783fe5df1cf5e9ad8',
+        'udev/libusbx-1.0.0.dylib'    : 'd4d61d9f4e5291e64c09783cb61bd1b4c67e202b514f40989504a5852f7560b9'
+    ]
+
+    def sha256 = { File f ->
+        java.security.MessageDigest.getInstance('SHA-256')
+            .digest(java.nio.file.Files.readAllBytes(f.toPath()))
+            .encodeHex().toString()
+    }
+
+    // Check every input before overwriting any assembled application files.
+    locked.each { String relative, String expected ->
+        File src = new File(cache, relative)
+        if (!src.isFile()) {
+            throw new GradleException("Missing pinned native dependency: ${src}\nRun bootstrap-mac-arm64-native.sh on the build machine.")
+        }
+        String found = sha256(src)
+        if (found != expected) {
+            throw new GradleException("SHA-256 mismatch for ${relative}. Expected ${expected}, got ${found}. Do not substitute a newer Homebrew version silently.")
+        }
+    }
+
+    locked.each { String relative, String expected ->
+        File src = new File(cache, relative)
+        File dst = new File(nativeRoot, relative)
+        dst.parentFile.mkdirs()
+        java.nio.file.Files.copy(src.toPath(), dst.toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        if (relative in ['adb', 'fastboot', 'unyaffs']) {
+            if (!dst.setExecutable(true, false)) {
+                throw new GradleException("Could not set executable bit: ${dst}")
+            }
+        }
+        if (sha256(dst) != expected) {
+            throw new GradleException("Staged file failed SHA-256 verification: ${dst}")
+        }
+        println "STAGED pinned macOS ARM64 native dependency: ${relative}"
+    }
+}
