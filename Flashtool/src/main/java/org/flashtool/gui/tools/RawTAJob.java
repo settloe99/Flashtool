@@ -96,40 +96,9 @@ public class RawTAJob extends Job {
 			}
 			else throw new Exception("Backup is not OK");
 			}
-			else {
-				log.info("Device not rooted. Trying to backup ta using dirtycow exploit");
-				AdbUtility.run("rm -f /data/local/tmp/*");
-				String platform = Devices.getCurrent().getArch();
-				AdbUtility.push(OS.getFolderCustom()+File.separator+"root"+File.separator+"dirtycow"+File.separator+"backupTA.sh", "/data/local/tmp/");
-				AdbUtility.run("chmod 755 /data/local/tmp/backupTA.sh");
-				AdbUtility.push(OS.getFolderCustom()+File.separator+"root"+File.separator+"dirtycow"+File.separator+"dirtycow"+platform, "/data/local/tmp/dirtycow");
-				AdbUtility.run("chmod 755 /data/local/tmp/dirtycow");
-				AdbUtility.push(OS.getFolderCustom()+File.separator+"root"+File.separator+"dirtycow"+File.separator+"dumpta"+platform, "/data/local/tmp/dumpta");
-				AdbUtility.run("chmod 755 /data/local/tmp/dumpta");
-				AdbUtility.push(OS.getFolderCustom()+File.separator+"root"+File.separator+"dirtycow"+File.separator+"exploitta"+platform, "/data/local/tmp/exploitta");
-				AdbUtility.run("chmod 755 /data/local/tmp/exploitta");
-				AdbUtility.push(OS.getFolderCustom()+File.separator+"root"+File.separator+"dirtycow"+File.separator+"run-as"+platform, "/data/local/tmp/run-as");
-				AdbUtility.run("chmod 755 /data/local/tmp/run-as");
-				AdbUtility.run("cd /data/local/tmp && ./backupTA.sh "+tafilename);
-				if (AdbUtility.exists("/data/local/tmp/"+tafilename)) {
-					new File(folder).mkdirs();
-					AdbUtility.pull("/data/local/tmp/"+tafilename, folder);
-				}
-				AdbUtility.run("rm -f /data/local/tmp/*");
-				AdbUtility.run("rm -f /sdcard/dumpta");
-				File tafile=new File(folder+File.separator+tafilename);
-				if (tafile.exists()) {
-					if (tafile.length()==(2*1024*1024)) {
-						createFTA("", folder);
-					}
-					else {
-						log.error("dirtycow expoit failed. No ta backup done");
-					}
-				}
-				else {
-					log.error("dirtycow expoit failed. No ta backup done");
-				}	
-			}
+            else {
+                log.error("Unrooted Raw TA backup is not included in this community release.");
+            }
 		} catch (Exception ex) {
 			new File(folder+tafilename).delete();
 			try {

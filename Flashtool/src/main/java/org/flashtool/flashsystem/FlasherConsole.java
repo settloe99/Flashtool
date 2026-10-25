@@ -67,60 +67,17 @@ public class FlasherConsole {
 	}
 	
 	public static void doRoot() {
-		Devices.waitForReboot(false);
-		if (Devices.getCurrent().getVersion().contains("2.3")) {
-			if (!Devices.getCurrent().hasRoot())
-				doRootzergRush();
-			else log.error("Your device is already rooted");
-		}
-		else 
-			if (!Devices.getCurrent().hasRoot())
-				doRootpsneuter();
-			else log.error("Your device is already rooted");
-		exit();
-	}
+        log.error("Legacy rooting is not included in this community release.");
+        exit();
+    }
 
 	public static void doRootzergRush() {
-				try {
-					AdbUtility.push(Devices.getCurrent().getBusybox(false), GlobalConfig.getProperty("deviceworkdir")+"/busybox");
-					FTShell shell = new FTShell("busyhelper");
-					shell.run(true);
-					AdbUtility.push(new File("."+fsep+"custom"+fsep+"root"+fsep+"zergrush.tar.uue").getAbsolutePath(),GlobalConfig.getProperty("deviceworkdir"));
-					shell = new FTShell("rootit");
-					log.info("Running part1 of Root Exploit, please wait");
-					shell.run(true);
-					Devices.waitForReboot(true);
-					log.info("Running part2 of Root Exploit");
-					shell = new FTShell("rootit2");
-					shell.run(false);
-					log.info("Finished!.");
-					log.info("Root should be available after reboot!");		
-				}
-				catch (Exception e) {
-					log.error(e.getMessage());
-				}
-	}
+        log.error("Legacy rooting is not included in this community release.");
+    }
 
 	public static void doRootpsneuter() {
-				try {
-					AdbUtility.push(Devices.getCurrent().getBusybox(false), GlobalConfig.getProperty("deviceworkdir")+"/busybox");
-					FTShell shell = new FTShell("busyhelper");
-					shell.run(true);
-					AdbUtility.push("."+fsep+"custom"+fsep+"root"+fsep+"psneuter.tar.uue",GlobalConfig.getProperty("deviceworkdir"));
-					shell = new FTShell("rootit");
-					log.info("Running part1 of Root Exploit, please wait");
-					shell.run(false);
-					Devices.waitForReboot(true);
-					log.info("Running part2 of Root Exploit");
-					shell = new FTShell("rootit2");
-					shell.run(false);
-					log.info("Finished!.");
-					log.info("Root should be available after reboot!");		
-				}
-				catch (Exception e) {
-					log.error(e.getMessage());
-				}
-	}
+        log.error("Legacy rooting is not included in this community release.");
+    }
 	
 	public static void doGetIMEI() throws Exception {
 		Flasher f=null;

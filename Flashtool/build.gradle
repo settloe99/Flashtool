@@ -117,7 +117,11 @@ distributions {
 				}
 			}
 			if (os.contains("mac")) {
-               from ('src/main/resources/custom') { into 'FlashTool.app/Contents/MacOS/custom' }
+               from ('src/main/resources/custom') {
+                   into 'FlashTool.app/Contents/MacOS/custom'
+                   // Community core: do not bundle legacy rooting payloads.
+                   exclude 'root/**'
+               }
  			   from(jre) { into 'FlashTool.app/Contents/MacOS/jre' }
 			} else {
                from ('src/main/resources/custom') { into 'custom' }
@@ -141,6 +145,11 @@ installDist.doLast() {
            def dist = "${buildDir}/install/${project.name}"
            if (arch in ['arm64', 'aarch64']) {
                project.ext.stagePinnedMacArm64Native.call(file("$dist/FlashTool.app/Contents/MacOS/x10flasher_native"))
+           }
+           // Stop if legacy rooting resources entered the assembled application.
+           def packagedRoot = file("$dist/FlashTool.app/Contents/MacOS/custom/root")
+           if (packagedRoot.exists()) {
+               throw new GradleException("Community build contains excluded rooting payloads: $packagedRoot")
            }
            ant.move(file: "$dist/lib", toFile: "$dist/FlashTool.app/Contents/MacOS/lib")
            def udevDir = file("$dist/FlashTool.app/Contents/MacOS/x10flasher_native/udev")
@@ -410,7 +419,7 @@ task createDMG() {
 
         def outputFile = new File(
             outputDir,
-            "Flashtool-${flashtoolVersion}-mac-arm64-preview3.dmg"
+            "Flashtool-${flashtoolVersion}-mac-arm64-community-rc1.dmg"
         )
 
         delete stagingDir

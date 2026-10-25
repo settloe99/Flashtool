@@ -305,7 +305,8 @@ public class MainSWT {
 		mntmNoDevice.setMenu(menu_device);
 		
 		MenuItem mntmRoot = new MenuItem(menu_device, SWT.CASCADE);
-		mntmRoot.setText("Root");
+		mntmRoot.setText("Rooting (not included)");
+		mntmRoot.setEnabled(false);
 		
 		Menu menu_10 = new Menu(mntmRoot);
 		mntmRoot.setMenu(menu_10);
@@ -724,7 +725,8 @@ public class MainSWT {
 		mntmFlashSingleTA.setText("Flash TA file");
 		
 		MenuItem mntmRaw = new MenuItem(menu_9, SWT.CASCADE);
-		mntmRaw.setText("Raw device");
+		mntmRaw.setText("Raw device (not included)");
+		mntmRaw.setEnabled(false);
 		
 		Menu menu_14 = new Menu(mntmRaw);
 		mntmRaw.setMenu(menu_14);
@@ -1363,7 +1365,7 @@ public class MainSWT {
     			}
     			else {
     				boolean hasSU = Devices.getCurrent().hasSU();
-    				WidgetTask.setEnabled(tltmRoot, !hasSU);
+				WidgetTask.setEnabled(tltmRoot, false);
     				WidgetTask.setEnabled(tltmApkInstall, true);
     				boolean hasRoot=false;
     				if (hasSU) {
@@ -1455,18 +1457,8 @@ public class MainSWT {
 	}
 
 	public void doInstFlashtool() {
-		try {
-			if (!AdbUtility.exists("/system/flashtool")) {
-				Devices.getCurrent().doBusyboxHelper();
-				log.info("Installing toolbox to device...");
-				AdbUtility.push(OS.getFolderCustom()+File.separator+"root"+File.separator+"ftkit.tar",GlobalConfig.getProperty("deviceworkdir"));
-				FTShell ftshell = new FTShell("installftkit");
-				ftshell.runRoot();
-			}
-		}
-		catch (Exception e) {
-			log.error(e.getMessage());
-		}
+        // Legacy ftkit.tar is excluded from the community core installer.
+        log.info("Legacy device toolkit installation is not included in this community release.");
     }
 
 	public void doFlash() throws Exception {
@@ -1697,40 +1689,12 @@ public class MainSWT {
 	}
 
 	public void doRoot() {
-		String pck = WidgetTask.openRootPackageSelector(shlSonyericsson);
-		RootJob rj = new RootJob("Root device");
-		rj.setRootPackage(pck);
-		rj.setParentShell(shlSonyericsson);
-		if (Devices.getCurrent().getVersion().contains("4.3") || Devices.getCurrent().getVersion().contains("4.4"))
-			rj.setAction("doRootTowelroot");
-		else
-			if (Devices.getCurrent().getVersion().contains("4.2"))
-				rj.setAction("doRootPerfEvent");			
-			else
-				if (Devices.getCurrent().getVersion().contains("4.1"))
-					rj.setAction("doRootServiceMenu");
-				else
-					if (Devices.getCurrent().getVersion().contains("4.0.3"))
-						rj.setAction("doRootEmulator");
-					else
-						if (Devices.getCurrent().getVersion().contains("4.0"))
-							rj.setAction("doRootAdbRestore");
-						else
-							if (Devices.getCurrent().getVersion().contains("2.3"))
-								rj.setAction("doRootzergRush");
-							else
-								rj.setAction("doRootpsneuter");					
-		rj.schedule();
-	}
+        log.warn("Legacy rooting is not included in this community release.");
+    }
 	
 	public void doRoot(String rootmethod) {
-		String pck = WidgetTask.openRootPackageSelector(shlSonyericsson);
-		RootJob rj = new RootJob("Root device");
-		rj.setRootPackage(pck);
-		rj.setParentShell(shlSonyericsson);
-		rj.setAction(rootmethod);							
-		rj.schedule();		
-	}
+        log.warn("Legacy rooting is not included in this community release.");
+    }
 
 	public void doYaffs2Unpack() {
 		FileDialog dlg = new FileDialog(shlSonyericsson);
