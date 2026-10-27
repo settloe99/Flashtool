@@ -1,0 +1,52 @@
+jar_file,sha256_of_RC1_artifact,licence_review_status,licence_family_lead
+JavaEWAH-1.1.13.jar,4c0fda2b1d317750d7ea324e36c70b2bc48310c0aaae67b98df0915d696d7111,Not individually cleared,Confirm from specific POM/JAR notices
+apk-parser-2.6.10.jar,4e07ef65005c0d7e7149f6e903828fdaa031f542ad3956f0d827197a5ccac640,Not individually cleared,Confirm from specific POM/JAR notices
+bcprov-jdk18on-1.71.jar,f3433a97d780fe9fa3dc3d562a41decd59b2e617ce884de9060349ac14750045,Not individually cleared,Confirm from specific POM/JAR notices
+bcutil-jdk18on-1.71.jar,ac75ae3fabf2cb81210b3648fbe36aaed8d8c453bbeaac40e3b5031c7677197a,Not individually cleared,Confirm from specific POM/JAR notices
+bigdoc-0.3.0.jar,d54ebea77052dcf31a61b2148ac0929278073d3dc7824b0e4d68f100513e5d46,Not individually cleared,Confirm from specific POM/JAR notices
+bsh-2.0b6.jar,a17955976070c0573235ee662f2794a78082758b61accffce8d3f8aedcd91047,Not individually cleared,Confirm from specific POM/JAR notices
+checker-qual-3.12.0.jar,ff10785ac2a357ec5de9c293cb982a2cbb605c0309ea4cc1cb9b9bc6dbe7f3cb,Not individually cleared,Confirm from specific POM/JAR notices
+commons-compress-1.21.jar,6aecfd5459728a595601cfa07258d131972ffc39b492eb48bdd596577a2f244a,Not individually cleared,Confirm from specific POM/JAR notices
+commons-io-2.11.0.jar,961b2f6d87dbacc5d54abf45ab7a6e2495f89b75598962d8c723cea9bc210908,Not individually cleared,Confirm from specific POM/JAR notices
+delight-rhino-sandbox-0.0.15.jar,e287824b39907a21ee8dfc5a0c738be110fb256374d5dd87dbd8c0ad6d8ac44d,Not individually cleared,Confirm from specific POM/JAR notices
+error_prone_annotations-2.11.0.jar,721cb91842b46fa056847d104d5225c8b8e1e8b62263b993051e1e5a0137b7ec,Not individually cleared,Confirm from specific POM/JAR notices
+failureaccess-1.0.1.jar,a171ee4c734dd2da837e4b16be9df4661afab72a41adaf31eb84dfdaf936ca26,Not individually cleared,Confirm from specific POM/JAR notices
+finbin-0.6.2.jar,affe9f92237afbaced63be1112910a2f209e761a5980999b02a7ed71224bbe93,Not individually cleared,Confirm from specific POM/JAR notices
+guava-31.1-jre.jar,a42edc9cab792e39fe39bb94f3fca655ed157ff87a8af78e1d6ba5b07c4a00ab,Not individually cleared,Confirm from specific POM/JAR notices
+ini4j-0.5.4.jar,aad60635eee567254ed29f18fb18c0f9e4c4dacf51c8229128203183bb35e2dd,Not individually cleared,Confirm from specific POM/JAR notices
+j2objc-annotations-1.3.jar,21af30c92267bd6122c0e0b4d20cccb6641a37eaf956c6540ec471d584e64a7b,Not individually cleared,Confirm from specific POM/JAR notices
+jarchivelib-1.2.0.jar,524142e431fc739120d961457c29ac1f9d384ab03265aaef2d6aa39677c9ad93,Not individually cleared,Confirm from specific POM/JAR notices
+jbbp-2.0.4.jar,e1c430e0cf5ca8ca3dfacef1b3af7202ed83cdddaad7bc4a3c1fbffc2a84f1e3,Not individually cleared,Confirm from specific POM/JAR notices
+jdom2-2.0.6.1.jar,0b20f45e3a0fd8f0d12cdc5316b06776e902b1365db00118876f9175c60f302c,Not individually cleared,Confirm from specific POM/JAR notices
+jelf-0.7.0.jar,f5d02ae7766c11e2d6079ad47bb76706eead84b4c12503375f5ee43834251d1a,Not individually cleared,Confirm from specific POM/JAR notices
+jna-5.12.1.jar,91a814ac4f40d60dee91d842e1a8ad874c62197984403d0e3c30d39e55cf53b3,Not individually cleared,Confirm from specific POM/JAR notices
+jna-platform-5.12.1.jar,8ce969116cac95bd61b07a8d5e07174b352e63301473caac72c395e3c08488d2,Not individually cleared,Confirm from specific POM/JAR notices
+jsr305-3.0.2.jar,766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7,Not individually cleared,Confirm from specific POM/JAR notices
+listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar,b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99,Not individually cleared,Confirm from specific POM/JAR notices
+logback-classic-1.4.0.jar,9ce4cfee4834195753b5be5016ded641e8456d9e82995821838dc662e866e212,Not individually cleared,Confirm from specific POM/JAR notices
+logback-core-1.4.0.jar,14e09a7896bee6ef2e005b48fc5560fe2299a57a826bc4c1f1c6d43002f0512c,Not individually cleared,Confirm from specific POM/JAR notices
+lz4-java-1.8.0.jar,d74a3334fb35195009b338a951f918203d6bbca3d1d359033dc33edd1cadc9ef,Not individually cleared,Confirm from specific POM/JAR notices
+org.eclipse.core.commands-3.10.200.jar,35af2254a0b6d8d5b328853739882ff4baae734b6d19e82c955426e470890a25,Not individually cleared,"Eclipse Platform, review EPL-2.0 and secondary licence status"
+org.eclipse.core.contenttype-3.9.900.jar,6c57132740523b5c5de125c0041ca43c1606da6563214c1bae3999fa21ead893,Not individually cleared,"Eclipse Platform, review EPL-2.0 and secondary licence status"
+org.eclipse.core.jobs-3.15.900.jar,941b3c5feeba4ec0a949a8a94ff10283b2505813fa736c9e6345f146ae1b7e8a,Not individually cleared,"Eclipse Platform, review EPL-2.0 and secondary licence status"
+org.eclipse.core.runtime-3.25.0.jar,a6f61da3c508c618ea805188a84db9d798528ad5f3039c1d594833db7412897e,Not individually cleared,"Eclipse Platform, review EPL-2.0 and secondary licence status"
+org.eclipse.equinox.app-1.7.600.jar,fd353398835107608f554779a6e91891725efb94e0f57559d0ab3cea4b6156c7,Not individually cleared,"Eclipse Platform, review EPL-2.0 and secondary licence status"
+org.eclipse.equinox.common-3.21.0.jar,2545ed27d408f19882695703097e5998bf25652bd0dac76a8e6d1391ec228ab7,Not individually cleared,"Eclipse Platform, review EPL-2.0 and secondary licence status"
+org.eclipse.equinox.preferences-3.12.100.jar,fd04e81a28ab32b6bb073286eb293c44b760176fcf1e35ef15614d62df820f86,Not individually cleared,"Eclipse Platform, review EPL-2.0 and secondary licence status"
+org.eclipse.equinox.registry-3.12.600.jar,4f8cd72681446b598390a8c24ee9b9996f6e4c5fabed022b50bd26f6f5a0bf6c,Not individually cleared,"Eclipse Platform, review EPL-2.0 and secondary licence status"
+org.eclipse.jface-3.26.0.jar,7d13ef252ccf2e12b4afc80b3dd18066aa1b3d9783cc87daeb6d70a6445ec8db,Not individually cleared,"Eclipse Platform, review EPL-2.0 and secondary licence status"
+org.eclipse.jgit-6.3.0.202209071007-r.jar,d3b497217f21f99e95c6ba85d50299d322780c975f6007b8a0eba3acf9123603,Not individually cleared,"JGit, review Eclipse Distribution License"
+org.eclipse.jgit.archive-6.3.0.202209071007-r.jar,f7d46b9d09b9db3a19f0a0aa2d234ab2d0379583bd8a0608e813e0bc59d687a2,Not individually cleared,"JGit, review Eclipse Distribution License"
+org.eclipse.osgi-3.24.300.jar,4a770aa4a78df653af871073c8b4ddd56884895f5fc71d10c40b4289ac7c8b9f,Not individually cleared,"Eclipse Platform, review EPL-2.0 and secondary licence status"
+org.eclipse.swt-3.132.0.jar,bbfdbd0ac5749ee9525ed8a08c30c196ee0097e7634e384765803289fd04c66f,Not individually cleared,"Eclipse Platform, review EPL-2.0 and secondary licence status"
+org.eclipse.swt.cocoa.macosx.aarch64-3.132.0.jar,d08b3446a5ca524f0a56c70b1fb715c8dca20eb0a30bb6aa33a061ff4b87b562,Not individually cleared,"Eclipse Platform, review EPL-2.0 and secondary licence status"
+org.osgi.core-6.0.0.jar,1c1bb435eb34cbf1f743653da38f604d45d53fbc95979053768cd3fc293cb931,Not individually cleared,Confirm from specific POM/JAR notices
+org.osgi.service.prefs-1.1.2.jar,43c7c870710e363405d422da653cce0d798a4537f76e4930f79bceadd3a55345,Not individually cleared,Confirm from specific POM/JAR notices
+osgi.annotation-8.0.1.jar,a0e8a4c362bd3600812f37b0ea45fba966c7bc049d01fed56a09ecc74082759e,Not individually cleared,Confirm from specific POM/JAR notices
+picocli-4.6.3.jar,b0a5159e926de8084ff066025142270443533656bc599b8bb31d14d11fd138a4,Not individually cleared,Confirm from specific POM/JAR notices
+proxy-vole-1.0.17.jar,7e12a90976c72559019495042b3e51436cf5dcdee6bd31cab5791888a2855015,Not individually cleared,Confirm from specific POM/JAR notices
+rhino-runtime-1.7.13.jar,11acf4e03f7f95d164d21d10ee170d7c878c9fd87871f7eaba9c4a66a1d617e7,Not individually cleared,Confirm from specific POM/JAR notices
+simple-4.1.21.jar,8e6439fcc1f2fe87b5dfc20eb13289acba8047e9cfadf45ad3dc5c57a9bcd054,Not individually cleared,Confirm from specific POM/JAR notices
+slf4j-api-2.0.0.jar,a223e6df91b84f19d49c5ebc5f5f97c7f4438419f84a52fa05e1cfc6eed38aa9,Not individually cleared,Confirm from specific POM/JAR notices
+slf4j-ext-2.0.0.jar,6d61110215d995a191d80c605490d14c095b3ad1ea2c854ea669dc7cb2142a3d,Not individually cleared,Confirm from specific POM/JAR notices
+ttorrent-core-1.5.jar,12cbc7d9fd94d31953b04937d0002f45cf4e9d495ad86c4e40c5dd635d11509d,Not individually cleared,Confirm from specific POM/JAR notices

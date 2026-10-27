@@ -7,7 +7,7 @@
 	<key>CFBundleExecutable</key>
 	<string>FlashTool</string>
 	<key>CFBundleGetInfoString</key>
-	<string>FlashTool 0.9.36 Apple Silicon Preview 1</string>
+	<string>Flashtool Community Edition 0.9.36 RC2</string>
 	<key>CFBundleIconFile</key>
 	<string>FlashTool.icns</string>
 	<key>CFBundleIdentifier</key>

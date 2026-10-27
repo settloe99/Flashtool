@@ -317,6 +317,27 @@ installDist.doLast {
             )
         }
 
+        // Community release: include attribution BEFORE final code-signing.
+        def noticeDest = new File(contents, "Resources")
+        noticeDest.mkdirs()
+        [
+            "COPYING": "LICENSE",
+            "LICENSING.md": "LICENSING.md",
+            "THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES",
+            "THIRD_PARTY_JARS_RC1.csv": "THIRD_PARTY_JARS_RC1.csv"
+        ].each { sourceName, targetName ->
+            def source = rootProject.file(sourceName)
+            if (!source.isFile()) {
+                throw new GradleException("Missing release notice: ${source}")
+            }
+            java.nio.file.Files.copy(
+                source.toPath(),
+                new File(noticeDest, targetName).toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING
+            )
+        }
+        // Ensure all three files are inside the bundle when it is signed.
+
         // Remove problematic metadata from the assembled copy only.
         project.exec {
             commandLine "xattr", "-cr", appDir.absolutePath
@@ -419,7 +440,7 @@ task createDMG() {
 
         def outputFile = new File(
             outputDir,
-            "Flashtool-${flashtoolVersion}-mac-arm64-community-rc1.dmg"
+            "Flashtool-${flashtoolVersion}-mac-arm64-community-rc2.dmg"
         )
 
         delete stagingDir
