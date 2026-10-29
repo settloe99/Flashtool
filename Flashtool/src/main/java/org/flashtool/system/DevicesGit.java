@@ -2,6 +2,7 @@ package org.flashtool.system;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.function.Consumer;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.ResetCommand;
 import org.eclipse.jgit.api.ResetCommand.ResetType;
@@ -22,13 +23,26 @@ public class DevicesGit {
 	private static String localPath=OS.getFolderDevices()+File.separator+".git";
     private static Repository localRepo;
     private static Git git;
-    
-    public static void gitSync() throws IOException, InvalidRemoteException, org.eclipse.jgit.api.errors.TransportException, GitAPIException {
-    	if (openRepository()) {
-    		pullRepository();
-    	}
-    	else cloneRepository();
+
+
+public static void gitSync() throws IOException, InvalidRemoteException,
+        org.eclipse.jgit.api.errors.TransportException, GitAPIException {
+    gitSync(message -> {});
+}
+
+public static void gitSync(Consumer<String> onStage)
+        throws IOException, InvalidRemoteException,
+        org.eclipse.jgit.api.errors.TransportException, GitAPIException {
+
+    if (openRepository()) {
+        onStage.accept("Checking for device definition updates...");
+        pullRepository();
+    } else {
+        onStage.accept("Downloading device definitions...");
+        cloneRepository();
     }
+}
+
 
     public static void cloneRepository() {
 		try {

@@ -9,22 +9,33 @@ import org.eclipse.core.runtime.jobs.Job;
 import org.flashtool.gui.TARestore;
 import org.flashtool.system.DevicesGit;
 
+import java.util.function.Consumer;
+
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class DevicesSyncJob extends Job {
 
 	boolean canceled = false;
-	
 
-	public DevicesSyncJob(String name) {
-		super(name);
-	}
-	
+
+
+private final Consumer<String> onStage;
+
+public DevicesSyncJob(String name) {
+    this(name, message -> {});
+}
+
+public DevicesSyncJob(String name, Consumer<String> onStage) {
+    super(name);
+    this.onStage = onStage == null ? message -> {} : onStage;
+}
+
+
     protected IStatus run(IProgressMonitor monitor) {
 		try {
 			log.info("Syncing devices from github");
-			DevicesGit.gitSync();
+			DevicesGit.gitSync(onStage);
 	    	log.info("Devices sync finished.");
 			return Status.OK_STATUS;
 		}

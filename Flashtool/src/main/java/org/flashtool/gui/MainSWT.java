@@ -74,14 +74,17 @@ import org.flashtool.system.StatusEvent;
 import org.flashtool.system.StatusListener;
 import org.eclipse.swt.custom.StyledText;
 import org.eclipse.swt.widgets.ProgressBar;
+import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.layout.GridData;
+import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.layout.FormLayout;
 import org.eclipse.swt.layout.FormData;
 import org.eclipse.swt.layout.FormAttachment;
-import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
-import org.eclipse.swt.custom.ScrolledComposite;
+import org.eclipse.swt.graphics.Font;
 
 @Slf4j
 public class MainSWT {
@@ -108,7 +111,7 @@ public class MainSWT {
 	protected MenuItem mntmFlashFromRaw;
 	protected VersionCheckerJob vcheck;
 	private boolean shuttingDown = false;
-	
+
 	/**
 	 * Open the window.
 	 */
@@ -143,10 +146,6 @@ public class MainSWT {
 			forceMove(OS.getWorkDir()+File.separator+"custom"+File.separator+"mydevices",OS.getFolderRegisteredDevices());
 			new File(OS.getWorkDir()+File.separator+"firmwares").delete();
 			new File(OS.getWorkDir()+File.separator+"custom"+File.separator+"mydevices").delete();
-		}
-		if (GlobalConfig.getProperty("gitauto").equals("true")) {
-			WaitForDevicesSync sync = new WaitForDevicesSync(shlSonyericsson,SWT.PRIMARY_MODAL | SWT.SHEET);
-			sync.open();
 		}
 		WidgetTask.setEnabled(mntmAdvanced,GlobalConfig.getProperty("devfeatures").equals("yes"));
 		StatusListener phoneStatus = new StatusListener() {
@@ -189,10 +188,31 @@ public class MainSWT {
 				}
 			}
 		};
-		killAdbandFastboot();
-		Devices.load();
-		log.info("Starting phone detection");
-		DeviceChangedListener.starts(phoneStatus);
+
+if ("true".equals(GlobalConfig.getProperty("gitauto"))) {
+
+    WaitForDevicesSync startup = new WaitForDevicesSync(
+        shlSonyericsson,
+        SWT.PRIMARY_MODAL | SWT.SHEET
+    );
+
+
+    startup.open(() ->
+        initialiseDeviceSupport(
+            phoneStatus,
+            startup::setStatus,
+            startup::finishStartup
+    )
+);
+
+} else {
+    initialiseDeviceSupport(
+    phoneStatus,
+    message -> {},
+    () -> {}
+);
+}
+
 		//phoneWatchdog = new AdbPhoneThread();
 		//phoneWatchdog.start();
 		//phoneWatchdog.addStatusListener(phoneStatus);
@@ -202,6 +222,88 @@ public class MainSWT {
 			}
 		}
 	}
+
+private void initialiseDeviceSupport(
+        StatusListener phoneStatus,
+        java.util.function.Consumer<String> reportStatus,
+        Runnable onComplete) {
+
+    String[] messages = {
+        "Preparing device connection...",
+        "Loading device database...",
+        "Starting device detection..."
+    };
+
+    Runnable[] operations = {
+        () -> killAdbandFastboot(),
+        () -> Devices.load(),
+        () -> {
+            log.info("Starting phone detection");
+            DeviceChangedListener.starts(phoneStatus);
+        }
+    };
+
+    runStartupStage(
+        0, messages, operations, reportStatus, onComplete
+    );
+}
+
+private void runStartupStage(
+        int index,
+        String[] messages,
+        Runnable[] operations,
+        java.util.function.Consumer<String> reportStatus,
+        Runnable onComplete) {
+
+    Display display = shlSonyericsson.getDisplay();
+
+    if (display.isDisposed()) {
+        return;
+    }
+
+    if (index >= operations.length) {
+        onComplete.run();
+        return;
+    }
+
+    if (shlSonyericsson.isDisposed()) {
+        onComplete.run();
+        return;
+    }
+
+    // Update and repaint the status before doing the work.
+    reportStatus.accept(messages[index]);
+
+    // Schedule each stage separately through the SWT event loop.
+    display.asyncExec(() -> {
+
+        if (shlSonyericsson.isDisposed()) {
+            onComplete.run();
+            return;
+        }
+
+        try {
+            operations[index].run();
+
+            runStartupStage(
+                index + 1,
+                messages,
+                operations,
+                reportStatus,
+                onComplete
+            );
+
+        } catch (RuntimeException ex) {
+            log.error(
+                "Startup failed: " + messages[index],
+                ex
+            );
+
+            onComplete.run();
+        }
+    });
+}
+
 
 	public void doDisableIdent() {
 		WidgetTask.setEnabled(tltmFlash,true);
@@ -216,7 +318,7 @@ public class MainSWT {
 		WidgetTask.setEnabled(tltmClean,false);
 		WidgetTask.setEnabled(tltmRecovery,false);
 	}
-	
+
 	/**
 	 * Create contents of the window.
 	 * @wbp.parser.entryPoint
@@ -231,19 +333,19 @@ public class MainSWT {
 		    });
 
 		shlSonyericsson.setSize(800, 460);
-		shlSonyericsson.setText("Sony Mobile Flasher by Androxyde");
+		shlSonyericsson.setText("Flashtool v" + About.getVersion());
 		shlSonyericsson.setImage(SWTResourceManager.getImage(MainSWT.class, "/gui/ressources/icons/flash_512.png"));
 		shlSonyericsson.setLayout(new FormLayout() );
-		
+
 		Menu menu = new Menu(shlSonyericsson, SWT.BAR);
 		shlSonyericsson.setMenuBar(menu);
-		
+
 		MenuItem mntmFile = new MenuItem(menu, SWT.CASCADE);
 		mntmFile.setText("File");
-		
+
 		Menu menu_1 = new Menu(mntmFile);
 		mntmFile.setMenu(menu_1);
-		
+
 		mntmSwitchPro = new MenuItem(menu_1, SWT.NONE);
 		mntmSwitchPro.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -272,7 +374,7 @@ public class MainSWT {
 			}
 		});
 		mntmSwitchPro.setText(GlobalConfig.getProperty("devfeatures").equals("yes")?"Switch Simple":"Switch Pro");
-		
+
 		MenuItem mntmChangeUserHome = new MenuItem(menu_1, SWT.NONE);
 		mntmChangeUserHome.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -287,7 +389,7 @@ public class MainSWT {
 			}
 		});
 		mntmChangeUserHome.setText("Change User Home");
-		
+
 		MenuItem mntmExit = new MenuItem(menu_1, SWT.NONE);
 		mntmExit.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -297,20 +399,20 @@ public class MainSWT {
 			}
 		});
 		mntmExit.setText("Exit");
-		
+
 		mntmNoDevice = new MenuItem(menu, SWT.CASCADE);
 		mntmNoDevice.setText("No Device");
 		mntmNoDevice.setEnabled(false);
 		Menu menu_device = new Menu(mntmNoDevice);
 		mntmNoDevice.setMenu(menu_device);
-		
+
 		MenuItem mntmRoot = new MenuItem(menu_device, SWT.CASCADE);
 		mntmRoot.setText("Rooting (not included)");
 		mntmRoot.setEnabled(false);
-		
+
 		Menu menu_10 = new Menu(mntmRoot);
 		mntmRoot.setMenu(menu_10);
-		
+
 		MenuItem mntmForcePsneuter = new MenuItem(menu_10, SWT.NONE);
 		mntmForcePsneuter.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -319,7 +421,7 @@ public class MainSWT {
 			}
 		});
 		mntmForcePsneuter.setText("Force PsNeuter");
-		
+
 		MenuItem mntmForceZergrush = new MenuItem(menu_10, SWT.NONE);
 		mntmForceZergrush.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -328,7 +430,7 @@ public class MainSWT {
 			}
 		});
 		mntmForceZergrush.setText("Force zergRush");
-		
+
 		MenuItem mntmForceEmulator = new MenuItem(menu_10, SWT.NONE);
 		mntmForceEmulator.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -337,7 +439,7 @@ public class MainSWT {
 			}
 		});
 		mntmForceEmulator.setText("Force Emulator");
-		
+
 		MenuItem mntmForceAdbrestore = new MenuItem(menu_10, SWT.NONE);
 		mntmForceAdbrestore.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -346,7 +448,7 @@ public class MainSWT {
 			}
 		});
 		mntmForceAdbrestore.setText("Force AdbRestore");
-		
+
 		MenuItem mntmForceServicemenu = new MenuItem(menu_10, SWT.NONE);
 		mntmForceServicemenu.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -355,7 +457,7 @@ public class MainSWT {
 			}
 		});
 		mntmForceServicemenu.setText("Force ServiceMenu");
-		
+
 		MenuItem mntmRunRootShell = new MenuItem(menu_10, SWT.NONE);
 		mntmRunRootShell.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -364,7 +466,7 @@ public class MainSWT {
 			}
 		});
 		mntmRunRootShell.setText("Force Run Root Shell");
-		
+
 		MenuItem mntmTowelroot = new MenuItem(menu_10, SWT.NONE);
 		mntmTowelroot.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -373,7 +475,7 @@ public class MainSWT {
 			}
 		});
 		mntmTowelroot.setText("Force towelroot");
-		
+
 		mntmBackupSystemApps = new MenuItem(menu_device, SWT.NONE);
 		mntmBackupSystemApps.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -383,7 +485,7 @@ public class MainSWT {
 			}
 		});
 		mntmBackupSystemApps.setText("Backup system apps");
-		
+
 		mntmInstallBusybox = new MenuItem(menu_device, SWT.NONE);
 		mntmInstallBusybox.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -397,7 +499,7 @@ public class MainSWT {
 			}
 		});
 		mntmInstallBusybox.setText("Install busybox");
-		
+
 		MenuItem mntmLaunchServicemenu = new MenuItem(menu_device, SWT.NONE);
 		mntmLaunchServicemenu.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -411,7 +513,7 @@ public class MainSWT {
 			}
 		});
 		mntmLaunchServicemenu.setText("Launch ServiceMenu");
-		
+
 		MenuItem mntmReboot = new MenuItem(menu_device, SWT.NONE);
 		mntmReboot.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -424,13 +526,77 @@ public class MainSWT {
 			}
 		});
 		mntmReboot.setText("Reboot");
-		
+
 		MenuItem mntmNewSubmenu = new MenuItem(menu, SWT.CASCADE);
 		mntmNewSubmenu.setText("Tools");
-		
+
 		Menu menu_4 = new Menu(mntmNewSubmenu);
 		mntmNewSubmenu.setMenu(menu_4);
-		
+
+
+//
+// RC3 DEVELOPMENT ONLY: Progress overlay test
+// Remove this menu item before public release.
+//
+
+MenuItem mntmTestProgress = new MenuItem(menu_4, SWT.NONE);
+mntmTestProgress.setText("Test Progress (Development Only)");
+
+mntmTestProgress.addSelectionListener(new SelectionAdapter() {
+    @Override
+    public void widgetSelected(SelectionEvent e) {
+
+        // Prevent simultaneous test runs.
+        mntmTestProgress.setEnabled(false);
+
+        Display uiDisplay = shlSonyericsson.getDisplay();
+
+        // Use a background thread so SWT remains responsive.
+        Thread testThread = new Thread(() -> {
+            try {
+                // Start the progress indicator with 100 steps.
+                LogProgress.initProgress(100);
+
+                // Simulate progress from 0% to 100%.
+                for (int percentage = 0;
+                     percentage <= 100;
+                     percentage += 5) {
+
+                    LogProgress.updateProgressValue(percentage);
+
+                    // Pause for 250 milliseconds.
+                    Thread.sleep(250);
+                }
+
+                // Allow time to observe 100% before resetting.
+                Thread.sleep(1500);
+
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+
+            } finally {
+                // Reset and hide the progress indicator.
+                LogProgress.initProgress(0);
+
+                // Re-enable the menu item safely.
+                if (!uiDisplay.isDisposed()) {
+                    uiDisplay.asyncExec(() -> {
+                        if (!mntmTestProgress.isDisposed()) {
+                            mntmTestProgress.setEnabled(true);
+                        }
+                    });
+                }
+            }
+        }, "Flashtool-ProgressTest");
+
+        testThread.setDaemon(true);
+        testThread.start();
+    }
+});
+
+
+
+
 		MenuItem mntmNewItem = new MenuItem(menu_4, SWT.NONE);
 		mntmNewItem.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -440,13 +606,13 @@ public class MainSWT {
 			}
 		});
 		mntmNewItem.setText("Sin Editor");
-		
+
 		MenuItem mntmExtractors = new MenuItem(menu_4, SWT.CASCADE);
 		mntmExtractors.setText("Extractors");
-		
+
 		Menu menu_5 = new Menu(mntmExtractors);
 		mntmExtractors.setMenu(menu_5);
-		
+
 		MenuItem mntmYaffs = new MenuItem(menu_5, SWT.NONE);
 		mntmYaffs.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -455,7 +621,7 @@ public class MainSWT {
 			}
 		});
 		mntmYaffs.setText("Yaffs2");
-		
+
 		MenuItem mntmElf = new MenuItem(menu_5, SWT.NONE);
 		mntmElf.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -465,13 +631,13 @@ public class MainSWT {
 			}
 		});
 		mntmElf.setText("Elf");
-		
+
 		MenuItem mntmBundles = new MenuItem(menu_4, SWT.CASCADE);
 		mntmBundles.setText("Bundles");
-		
+
 		Menu menu_12 = new Menu(mntmBundles);
 		mntmBundles.setMenu(menu_12);
-		
+
 		MenuItem mntmNewItem_1 = new MenuItem(menu_12, SWT.NONE);
 		mntmNewItem_1.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -516,7 +682,7 @@ public class MainSWT {
 			}
 		});
 		mntmNewItem_1.setText("FILESET Decrypt");
-		
+
 		MenuItem mntmBundleCreation = new MenuItem(menu_12, SWT.NONE);
 		mntmBundleCreation.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -528,7 +694,7 @@ public class MainSWT {
 			}
 		});
 		mntmBundleCreation.setText("Create");
-		
+
 		/*MenuItem mntmBundleCreationFrom = new MenuItem(menu_12, SWT.NONE);
 		mntmBundleCreationFrom.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -540,27 +706,27 @@ public class MainSWT {
 			}
 		});
 		mntmBundleCreationFrom.setText("Create From Sony DB");*/
-		
+
 		mntmAdvanced = new MenuItem(menu, SWT.CASCADE);
 		mntmAdvanced.setText("Advanced");
-		
-		
+
+
 		Menu AdvancedMenu = new Menu(mntmAdvanced);
-		
+
 		mntmAdvanced.setMenu(AdvancedMenu);
-		
+
 		MenuItem mntmTrimArea = new MenuItem(AdvancedMenu, SWT.CASCADE);
 		mntmTrimArea.setText("Trim Area");
-		
+
 		Menu menu_9 = new Menu(mntmTrimArea);
 		mntmTrimArea.setMenu(menu_9);
-		
+
 		MenuItem mntmS = new MenuItem(menu_9, SWT.CASCADE);
 		mntmS.setText("S1");
-		
+
 		Menu menu_13 = new Menu(mntmS);
 		mntmS.setMenu(menu_13);
-		
+
 		MenuItem mntmTABackup = new MenuItem(menu_13, SWT.NONE);
 		mntmTABackup.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -589,7 +755,7 @@ public class MainSWT {
 									TABag bag = new TABag(chldPartition[j]);
 									if (bag.partition>0)
 										bags.add(bag);
-									
+
 								} catch (Exception ex) {}
 							}
 							if (bags.size()>0) {
@@ -652,7 +818,7 @@ public class MainSWT {
 			}
 		});
 		mntmTARestore.setText("Restore");
-		
+
 		mntmFlashSingleTA = new MenuItem(menu_13, SWT.NONE);
 		mntmFlashSingleTA.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -674,7 +840,7 @@ public class MainSWT {
 					if (bags.size()>0)
 						backupset.put(taf.getName(), bags);
 				}
-				
+
 				if (backupset.size()>0) {
 					TARestore restore = new TARestore(shlSonyericsson,SWT.PRIMARY_MODAL | SWT.SHEET);
 					result = (TADevice)restore.open(backupset);
@@ -723,14 +889,14 @@ public class MainSWT {
 		}
 		});
 		mntmFlashSingleTA.setText("Flash TA file");
-		
+
 		MenuItem mntmRaw = new MenuItem(menu_9, SWT.CASCADE);
 		mntmRaw.setText("Raw device (not included)");
 		mntmRaw.setEnabled(false);
-		
+
 		Menu menu_14 = new Menu(mntmRaw);
 		mntmRaw.setMenu(menu_14);
-		
+
 		mntmRawBackup = new MenuItem(menu_14, SWT.NONE);
 		mntmRawBackup.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -743,7 +909,7 @@ public class MainSWT {
 		});
 		mntmRawBackup.setText("Backup");
 		mntmRawBackup.setEnabled(false);
-		
+
 		mntmRawRestore = new MenuItem(menu_14, SWT.NONE);
 		mntmRawRestore.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -756,7 +922,7 @@ public class MainSWT {
 		});
 		mntmRawRestore.setText("Restore");
 		mntmRawRestore.setEnabled(false);
-		
+
 		mntmFlashFromRaw = new MenuItem(menu_13, SWT.NONE);
 		mntmFlashFromRaw.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -842,16 +1008,16 @@ public class MainSWT {
 		mntmUsbLogParser.setText("USB log parser");
 		MenuItem mntmDevices = new MenuItem(menu, SWT.CASCADE);
 		mntmDevices.setText("Devices");
-		
+
 		Menu menu_6 = new Menu(mntmDevices);
 		mntmDevices.setMenu(menu_6);
-		
+
 		MenuItem mntmNewSubmenu_1 = new MenuItem(menu_6, SWT.CASCADE);
 		mntmNewSubmenu_1.setText("Devices Sync");
-		
+
 		Menu menu_8 = new Menu(mntmNewSubmenu_1);
 		mntmNewSubmenu_1.setMenu(menu_8);
-		
+
 		MenuItem mntmSyncFromGit = new MenuItem(menu_8, SWT.NONE);
 		mntmSyncFromGit.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -861,13 +1027,13 @@ public class MainSWT {
 			}
 		});
 		mntmSyncFromGit.setText("Manual Sync");
-		
+
 		MenuItem mntmAutoSync = new MenuItem(menu_8, SWT.CASCADE);
 		mntmAutoSync.setText("Auto Sync");
-		
+
 		Menu menu_11 = new Menu(mntmAutoSync);
 		mntmAutoSync.setMenu(menu_11);
-		
+
 		MenuItem mntmOn = new MenuItem(menu_11, SWT.RADIO);
 		mntmOn.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -877,7 +1043,7 @@ public class MainSWT {
 		});
 		mntmOn.setText("On");
 		mntmOn.setSelection((GlobalConfig.getProperty("gitauto").equals("true")));
-		
+
 		MenuItem mntmOff = new MenuItem(menu_11, SWT.RADIO);
 		mntmOff.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -887,7 +1053,7 @@ public class MainSWT {
 		});
 		mntmOff.setText("Off");
 		mntmOff.setSelection((GlobalConfig.getProperty("gitauto").equals("false")));
-		
+
 		MenuItem mntmCheckDrivers = new MenuItem(menu_6, SWT.NONE);
 		mntmCheckDrivers.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -896,7 +1062,7 @@ public class MainSWT {
 			}
 		});
 		mntmCheckDrivers.setText("Check Drivers");
-		
+
 		/*MenuItem mntmCheck = new MenuItem(menu_6, SWT.NONE);
 		mntmCheck.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -917,13 +1083,13 @@ public class MainSWT {
 			}
 		});
 		mntmCheck.setText("Check Updates");*/
-		
+
 		MenuItem mntmEditor = new MenuItem(menu_6, SWT.CASCADE);
 		mntmEditor.setText("Manage");
-		
+
 		Menu menu_7 = new Menu(mntmEditor);
 		mntmEditor.setMenu(menu_7);
-		
+
 /*		MenuItem mntmNewItem_2 = new MenuItem(menu_7, SWT.NONE);
 		mntmNewItem_2.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -952,17 +1118,17 @@ public class MainSWT {
 			}
 		});
 		mntmNewItem_2.setText("Add Update URL");*/
-		
-		
+
+
 		//MenuItem mntmEdit = new MenuItem(menu_7, SWT.NONE);
 		//mntmEdit.setText("Edit");
-		
+
 		//MenuItem mntmAdd = new MenuItem(menu_7, SWT.NONE);
 		//mntmAdd.setText("Add");
-		
+
 		//MenuItem mntmRemove = new MenuItem(menu_7, SWT.NONE);
 		//mntmRemove.setText("Remove");
-		
+
 		MenuItem mntmExport = new MenuItem(menu_7, SWT.NONE);
 		mntmExport.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -983,7 +1149,7 @@ public class MainSWT {
 			}
 		});
 		mntmExport.setText("Export");
-		
+
 		MenuItem mntmImport = new MenuItem(menu_7, SWT.NONE);
 		mntmImport.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -994,7 +1160,7 @@ public class MainSWT {
         		for (int i=0;i<lfiles.length;i++) {
         			if (lfiles[i].getName().endsWith(".ftd")) {
         				String name = lfiles[i].getName();
-        				name = name.substring(0,name.length()-4);        				
+                        name = name.substring(0,name.length()-4);
         				try {
         					FTDEntry entry = new FTDEntry(name);
         					list.setProperty(entry.getId(), entry.getName());
@@ -1025,19 +1191,19 @@ public class MainSWT {
 			}
 		});
 		mntmImport.setText("Import");
-		
+
 		MenuItem mntmHelp = new MenuItem(menu, SWT.CASCADE);
 		mntmHelp.setText("Help");
-		
+
 		Menu menu_2 = new Menu(mntmHelp);
 		mntmHelp.setMenu(menu_2);
-		
+
 		MenuItem mntmLogLevel = new MenuItem(menu_2, SWT.CASCADE);
 		mntmLogLevel.setText("Log level");
-		
+
 		Menu menu_3 = new Menu(mntmLogLevel);
 		mntmLogLevel.setMenu(menu_3);
-		
+
 		MenuItem mntmError = new MenuItem(menu_3, SWT.RADIO);
 		mntmError.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -1049,7 +1215,7 @@ public class MainSWT {
 			}
 		});
 		mntmError.setText("error");
-		
+
 		MenuItem mntmWarning = new MenuItem(menu_3, SWT.RADIO);
 		mntmWarning.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -1061,7 +1227,7 @@ public class MainSWT {
 			}
 		});
 		mntmWarning.setText("warning");
-		
+
 		MenuItem mntmInfo = new MenuItem(menu_3, SWT.RADIO);
 		mntmInfo.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -1073,7 +1239,7 @@ public class MainSWT {
 			}
 		});
 		mntmInfo.setText("info");
-		
+
 		MenuItem mntmDebug = new MenuItem(menu_3, SWT.RADIO);
 		mntmDebug.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -1085,7 +1251,7 @@ public class MainSWT {
 			}
 		});
 		mntmDebug.setText("debug");
-		
+
 		MenuItem mntmAbout = new MenuItem(menu_2, SWT.NONE);
 		mntmAbout.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -1111,7 +1277,7 @@ public class MainSWT {
 		fd_flashtoolToolBar.top = new FormAttachment(0, 10);
 		fd_flashtoolToolBar.left = new FormAttachment(0, 10);
 		flashtoolToolBar.setLayoutData(fd_flashtoolToolBar);
-		
+
 		tltmFlash = new ToolItem(flashtoolToolBar, SWT.NONE);
 		tltmFlash.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -1123,7 +1289,7 @@ public class MainSWT {
 		});
 		tltmFlash.setImage(SWTResourceManager.getImage(MainSWT.class, "/gui/ressources/icons/flash_32.png"));
 		tltmFlash.setToolTipText("Flash device");
-		
+
 		tltmBLU = new ToolItem(flashtoolToolBar, SWT.NONE);
 		tltmBLU.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -1133,7 +1299,7 @@ public class MainSWT {
 		});
 		tltmBLU.setToolTipText("Bootloader Unlock");
 		tltmBLU.setImage(SWTResourceManager.getImage(MainSWT.class, "/gui/ressources/icons/blu_32.png"));
-		
+
 		tltmRoot = new ToolItem(flashtoolToolBar, SWT.NONE);
 		tltmRoot.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -1144,7 +1310,7 @@ public class MainSWT {
 		tltmRoot.setImage(SWTResourceManager.getImage(MainSWT.class, "/gui/ressources/icons/root_32.png"));
 		tltmRoot.setEnabled(false);
 		tltmRoot.setToolTipText("Root device");
-		
+
 		Button btnSaveLog = new Button(shlSonyericsson, SWT.NONE);
 		btnSaveLog.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -1155,9 +1321,10 @@ public class MainSWT {
 		});
 		FormData fd_btnSaveLog = new FormData();
 		fd_btnSaveLog.right = new FormAttachment(100, -10);
+		fd_btnSaveLog.bottom = new FormAttachment(100, -10);
 		btnSaveLog.setLayoutData(fd_btnSaveLog);
-		btnSaveLog.setText("Save log");
-		
+		btnSaveLog.setText("Save Log");
+
 		tltmAskRoot = new ToolItem(flashtoolToolBar, SWT.NONE);
 		tltmAskRoot.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -1168,7 +1335,7 @@ public class MainSWT {
 		tltmAskRoot.setImage(SWTResourceManager.getImage(MainSWT.class, "/gui/ressources/icons/askroot_32.png"));
 		tltmAskRoot.setEnabled(false);
 		tltmAskRoot.setToolTipText("Ask for root permissions");
-		
+
 		tltmApkInstall = new ToolItem(flashtoolToolBar, SWT.NONE);
 		tltmApkInstall.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -1187,7 +1354,7 @@ public class MainSWT {
 		});
 		tltmApkInstall.setEnabled(false);
 		tltmApkInstall.setImage(SWTResourceManager.getImage(MainSWT.class, "/gui/ressources/icons/customize_32.png"));
-		
+
 		tltmClean = new ToolItem(flashtoolToolBar, SWT.NONE);
 		tltmClean.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -1207,7 +1374,7 @@ public class MainSWT {
 		tltmClean.setToolTipText("Clean ROM");
 		tltmClean.setImage(SWTResourceManager.getImage(MainSWT.class, "/gui/ressources/icons/clean_32.png"));
 		tltmClean.setEnabled(false);
-		
+
 		tltmRecovery = new ToolItem(flashtoolToolBar, SWT.NONE);
 		tltmRecovery.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -1218,7 +1385,7 @@ public class MainSWT {
 		tltmRecovery.setToolTipText("Install Recovery");
 		tltmRecovery.setImage(SWTResourceManager.getImage(MainSWT.class, "/gui/ressources/icons/recovery_32.png"));
 		tltmRecovery.setEnabled(false);
-		
+
 		ToolItem tltmNewItem_1 = new ToolItem(flashtoolToolBar, SWT.NONE);
 		tltmNewItem_1.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -1228,52 +1395,97 @@ public class MainSWT {
 			}
 		});
 		tltmNewItem_1.setImage(SWTResourceManager.getImage(MainSWT.class, "/gui/ressources/icons/download_32.png"));
-		
+
 		ToolItem tltmNewItem_2 = new ToolItem(flashtoolToolBar, SWT.NONE);
 		tltmNewItem_2.setEnabled(false);
-		
-		ProgressBar progressBar = new ProgressBar(shlSonyericsson, SWT.NONE);
-		fd_btnSaveLog.bottom = new FormAttachment(progressBar, -6, SWT.TOP);
-		progressBar.setState(SWT.NORMAL);
-		LogProgress.registerProgressBar(progressBar);
-		FormData fd_progressBar = new FormData();
-		fd_progressBar.left = new FormAttachment(0, 10);
-		fd_progressBar.right = new FormAttachment(100, -10);
-		fd_progressBar.bottom = new FormAttachment(100, -10);
-		progressBar.setLayoutData(fd_progressBar);
-		
-		ScrolledComposite scrolledLog = new ScrolledComposite(shlSonyericsson, SWT.BORDER | SWT.H_SCROLL | SWT.V_SCROLL);
-		FormData fd_scrolledLog = new FormData();
-		fd_scrolledLog.bottom = new FormAttachment(btnSaveLog, -6);
-		fd_scrolledLog.left = new FormAttachment(0, 10);
-		fd_scrolledLog.right = new FormAttachment(100, -10);
-		scrolledLog.setLayoutData(fd_scrolledLog);
-		scrolledLog.setExpandHorizontal(true);
-		scrolledLog.setExpandVertical(true);
-		
-		StyledText logWindow = new StyledText(scrolledLog, SWT.BORDER | SWT.H_SCROLL | SWT.V_SCROLL);
-		logWindow.setEditable(false);
+
+		// StyledText owns its vertical scrolling. SWT.WRAP and the absence of
+		// horizontal scrolling allow long lines to fit the window width.
+		StyledText logWindow = new StyledText(shlSonyericsson,
+				SWT.BORDER | SWT.V_SCROLL | SWT.WRAP | SWT.READ_ONLY);
+
+        // Use a compact, readable monospaced font for the log.
+        Font logFont = new Font(
+            logWindow.getDisplay(),
+            "Menlo",
+            11,
+            SWT.NORMAL
+        );
+
+        logWindow.setFont(logFont);
+
+        // Release the font when the log control is destroyed.
+        logWindow.addDisposeListener(event -> {
+            if (!logFont.isDisposed()) {
+                logFont.dispose();
+            }
+        });
+
+		FormData fd_logWindow = new FormData();
+		fd_logWindow.top = new FormAttachment(flashtoolToolBar, 10, SWT.BOTTOM);
+		fd_logWindow.bottom = new FormAttachment(btnSaveLog, -6, SWT.TOP);
+		fd_logWindow.left = new FormAttachment(0, 10);
+		fd_logWindow.right = new FormAttachment(100, -10);
+		logWindow.setLayoutData(fd_logWindow);
 		MyLogger.getAppender().setStyledText(logWindow);
-		//StringAppender.setTextArea(logWindow);
-		GlobalState.setGUI();
-		scrolledLog.setContent(logWindow);
-		scrolledLog.setMinSize(logWindow.computeSize(SWT.DEFAULT, SWT.DEFAULT));
-		
-		ToolBar paypalToolbar = new ToolBar(shlSonyericsson, SWT.FLAT | SWT.RIGHT);
-		fd_scrolledLog.top = new FormAttachment(paypalToolbar, 2);
-		FormData fd_paypalToolbar = new FormData();
-		fd_paypalToolbar.top = new FormAttachment(0, 10);
-		fd_paypalToolbar.right = new FormAttachment(100, -10);
-		paypalToolbar.setLayoutData(fd_paypalToolbar);
-		
-		ToolItem paypalItem = new ToolItem(paypalToolbar, SWT.NONE);
-		paypalItem.addSelectionListener(new SelectionAdapter() {
-			@Override
-			public void widgetSelected(SelectionEvent e) {
-				Program.launch("https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=PPWH7M9MNCEPA");
+
+		// Non-modal progress overlay centred over the main window.
+		// It becomes visible only while an operation reports progress.
+		Composite progressOverlay = new Composite(shlSonyericsson, SWT.NONE);
+		GridLayout overlayLayout = new GridLayout(2, false);
+		overlayLayout.marginWidth = 16;
+		overlayLayout.marginHeight = 12;
+		progressOverlay.setLayout(overlayLayout);
+		FormData fd_progressOverlay = new FormData();
+		fd_progressOverlay.left = new FormAttachment(50, -190);
+		fd_progressOverlay.top = new FormAttachment(50, -46);
+		fd_progressOverlay.width = 380;
+		fd_progressOverlay.height = 92;
+		progressOverlay.setLayoutData(fd_progressOverlay);
+
+		Label progressDescription = new Label(progressOverlay, SWT.NONE);
+		progressDescription.setText("Operation in progress");
+		progressDescription.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+
+
+		Label progressPercentage = new Label(progressOverlay, SWT.RIGHT);
+
+		// Calculate enough space for the longest percentage.
+		progressPercentage.setText("100%");
+
+		GridData percentageLayout =
+            new GridData(SWT.END, SWT.CENTER, false, false);
+
+		percentageLayout.widthHint =
+            progressPercentage.computeSize(SWT.DEFAULT, SWT.DEFAULT).x + 8;
+
+		progressPercentage.setLayoutData(percentageLayout);
+
+		// Start at zero.
+		progressPercentage.setText("0%");
+
+
+		ProgressBar progressBar = new ProgressBar(progressOverlay, SWT.SMOOTH);
+		progressBar.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 2, 1));
+		LogProgress.registerProgressBar(progressBar);
+		LogProgress.registerProgressListener((active, percent) -> {
+			if (progressOverlay.isDisposed()) {
+				return;
+			}
+			if (active) {
+				progressPercentage.setText(percent + "%");
+				progressOverlay.setVisible(true);
+				progressOverlay.moveAbove(null);
+			} else {
+				progressOverlay.setVisible(false);
 			}
 		});
-		paypalItem.setImage(SWTResourceManager.getImage(MainSWT.class, "/gui/ressources/icons/paypal.png"));
+		progressOverlay.addDisposeListener(event -> LogProgress.registerProgressListener(null));
+		progressOverlay.setVisible(false);
+		progressOverlay.moveAbove(null);
+
+		GlobalState.setGUI();
+
 /*		try {
 		Language.Init(GlobalConfig.getProperty("language").toLowerCase());
 		} catch (Exception e) {
@@ -1373,7 +1585,7 @@ public class MainSWT {
     					hasRoot = Devices.getCurrent().hasRoot();
     					if (hasRoot) {
     						doInstFlashtool();
-    					}	
+                        }
     				}
     				doGiveRoot(hasRoot);
     			}
@@ -1450,7 +1662,7 @@ public class MainSWT {
 				log.warn("Please check your Phone and 'ALLOW' Superuseraccess!");
         		boolean hasRoot = Devices.getCurrent().hasRoot();
         		doGiveRoot(hasRoot);
-        		return Status.OK_STATUS;				
+                return Status.OK_STATUS;
 			}
 		};
 		job.schedule();
@@ -1471,12 +1683,12 @@ public class MainSWT {
 		else
 			log.info("Flash canceled");
 	}
-	
+
 	public void doFastBoot() throws Exception {
 		FastbootToolbox fbbox = new FastbootToolbox(shlSonyericsson,SWT.PRIMARY_MODAL | SWT.SHEET);
 		fbbox.open();
 	}
-	
+
 	public void doFlashmode(final String pftfpath, final String pftfname) throws Exception {
 		try {
 			if (GlobalConfig.getProperty("devfeatures").equals("yes")) {
@@ -1506,10 +1718,10 @@ public class MainSWT {
 		catch (Exception e) {
 			e.printStackTrace();
 		}
-		
-		
 
-		
+
+
+
 		/*Worker.post(new Job() {
 			public Object run() {
 				System.out.println("flashmode");
@@ -1520,7 +1732,7 @@ public class MainSWT {
 			    		bundle.open();
 				    	bundle.setSimulate(GlobalConfig.getProperty("simulate").toLowerCase().equals("yes"));
 						flash = new X10flash(bundle);
-						
+
 						/*if ((new WaitDeviceFlashmodeGUI(flash)).deviceFound(_root)) {
 				    		try {
 								flash.openDevice();
@@ -1562,7 +1774,7 @@ public class MainSWT {
 						public void running(IJobChangeEvent event) {}
 						public void scheduled(IJobChangeEvent event) {}
 						public void sleeping(IJobChangeEvent event) {}
-					
+
 						public void done(IJobChangeEvent event) {
 							GetULCodeJob j = (GetULCodeJob)event.getJob();
 							if (j.getPhoneCert().length()>0) {
@@ -1691,7 +1903,7 @@ public class MainSWT {
 	public void doRoot() {
         log.warn("Legacy rooting is not included in this community release.");
     }
-	
+
 	public void doRoot(String rootmethod) {
         log.warn("Legacy rooting is not included in this community release.");
     }
@@ -1709,7 +1921,7 @@ public class MainSWT {
         else
         	log.info("Canceled");
 	}
-	
+
 	public void forceMove(String source, String dest) {
 		try {
 			while (new File(source).list().length>0)
