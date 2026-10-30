@@ -533,70 +533,6 @@ private void runStartupStage(
 		Menu menu_4 = new Menu(mntmNewSubmenu);
 		mntmNewSubmenu.setMenu(menu_4);
 
-
-//
-// RC3 DEVELOPMENT ONLY: Progress overlay test
-// Remove this menu item before public release.
-//
-
-MenuItem mntmTestProgress = new MenuItem(menu_4, SWT.NONE);
-mntmTestProgress.setText("Test Progress (Development Only)");
-
-mntmTestProgress.addSelectionListener(new SelectionAdapter() {
-    @Override
-    public void widgetSelected(SelectionEvent e) {
-
-        // Prevent simultaneous test runs.
-        mntmTestProgress.setEnabled(false);
-
-        Display uiDisplay = shlSonyericsson.getDisplay();
-
-        // Use a background thread so SWT remains responsive.
-        Thread testThread = new Thread(() -> {
-            try {
-                // Start the progress indicator with 100 steps.
-                LogProgress.initProgress(100);
-
-                // Simulate progress from 0% to 100%.
-                for (int percentage = 0;
-                     percentage <= 100;
-                     percentage += 5) {
-
-                    LogProgress.updateProgressValue(percentage);
-
-                    // Pause for 250 milliseconds.
-                    Thread.sleep(250);
-                }
-
-                // Allow time to observe 100% before resetting.
-                Thread.sleep(1500);
-
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-
-            } finally {
-                // Reset and hide the progress indicator.
-                LogProgress.initProgress(0);
-
-                // Re-enable the menu item safely.
-                if (!uiDisplay.isDisposed()) {
-                    uiDisplay.asyncExec(() -> {
-                        if (!mntmTestProgress.isDisposed()) {
-                            mntmTestProgress.setEnabled(true);
-                        }
-                    });
-                }
-            }
-        }, "Flashtool-ProgressTest");
-
-        testThread.setDaemon(true);
-        testThread.start();
-    }
-});
-
-
-
-
 		MenuItem mntmNewItem = new MenuItem(menu_4, SWT.NONE);
 		mntmNewItem.addSelectionListener(new SelectionAdapter() {
 			@Override
@@ -1311,14 +1247,66 @@ mntmTestProgress.addSelectionListener(new SelectionAdapter() {
 		tltmRoot.setEnabled(false);
 		tltmRoot.setToolTipText("Root device");
 
-		Button btnSaveLog = new Button(shlSonyericsson, SWT.NONE);
-		btnSaveLog.addSelectionListener(new SelectionAdapter() {
-			@Override
-			public void widgetSelected(SelectionEvent e) {
-				String saved = MyLogger.writeFile();
-				WidgetTask.openOKBox(shlSonyericsson, "Logfile saved to "+OS.getFolderUserFlashtool()+File.separator+"flashtool_"+saved+".log");
-			}
-		});
+
+        Button btnSaveLog = new Button(shlSonyericsson, SWT.NONE);
+        btnSaveLog.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+
+            // Let the user choose where to save the log.
+            FileDialog dialog = new FileDialog(
+                shlSonyericsson, SWT.SAVE
+            );
+
+            dialog.setText("Save Flashtool Log");
+            dialog.setFilterNames(new String[] {
+                "Log files (*.log)",
+                "All files (*.*)"
+            });
+            dialog.setFilterExtensions(new String[] {
+                "*.log",
+                "*.*"
+            });
+
+            // Suggest a filename using the existing timestamp format.
+            dialog.setFileName(
+                "flashtool_" + MyLogger.getTimeStamp() + ".log"
+            );
+
+            dialog.setFilterPath(System.getProperty("user.home"));
+            dialog.setOverwrite(true);
+
+            String selectedPath = dialog.open();
+
+            // The user cancelled.
+            if (selectedPath == null) {
+                return;
+            }
+
+            try {
+                // Save the complete log history, not just visible text.
+                java.nio.file.Files.writeString(
+                    java.nio.file.Path.of(selectedPath),
+                    MyLogger.getAppender().getContent(),
+                    java.nio.charset.StandardCharsets.UTF_8
+                );
+
+                WidgetTask.openOKBox(
+                    shlSonyericsson,
+                    "Log file saved to:\n" + selectedPath
+                );
+
+            } catch (java.io.IOException ex) {
+                log.error("Unable to save log file", ex);
+
+                WidgetTask.openOKBox(
+                    shlSonyericsson,
+                    "Unable to save log file:\n" + ex.getMessage()
+                );
+            }
+        }
+    });
+
 		FormData fd_btnSaveLog = new FormData();
 		fd_btnSaveLog.right = new FormAttachment(100, -10);
 		fd_btnSaveLog.bottom = new FormAttachment(100, -10);
@@ -1428,6 +1416,23 @@ mntmTestProgress.addSelectionListener(new SelectionAdapter() {
 		fd_logWindow.right = new FormAttachment(100, -10);
 		logWindow.setLayoutData(fd_logWindow);
 		MyLogger.getAppender().setStyledText(logWindow);
+
+        // Clear only the visible log, preserving the saved log history.
+        Button btnClearLog = new Button(shlSonyericsson, SWT.NONE);
+        btnClearLog.setText("Clear Log");
+        btnClearLog.setToolTipText("Clear the log display");
+
+        FormData fd_btnClearLog = new FormData();
+        fd_btnClearLog.right = new FormAttachment(btnSaveLog, -8, SWT.LEFT);
+        fd_btnClearLog.bottom = new FormAttachment(100, -10);
+        btnClearLog.setLayoutData(fd_btnClearLog);
+
+        btnClearLog.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                logWindow.setText("");
+            }
+        });
 
 		// Non-modal progress overlay centred over the main window.
 		// It becomes visible only while an operation reports progress.

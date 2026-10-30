@@ -27,6 +27,8 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.Scanner;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.io.FileUtils;
 import org.eclipse.swt.SWT;
@@ -37,6 +39,7 @@ import org.eclipse.swt.widgets.Display;
 import org.flashtool.logger.MyLogger;
 
 import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.encoder.Encoder;
 import ch.qos.logback.core.encoder.LayoutWrappingEncoder;
 import ch.qos.logback.core.joran.spi.ConsoleTarget;
@@ -49,10 +52,10 @@ import ch.qos.logback.core.util.Loader;
 /**
  * OutputStreamAppender appends events to a {@link OutputStream}. This class
  * provides basic services that other appenders build upon.
- * 
+ *
  * For more information about this appender, please refer to the online manual
  * at http://logback.qos.ch/manual/appenders.html#OutputStreamAppender
- * 
+ *
  * @author Ceki G&uuml;lc&uuml;
  */
 public class FlashtoolAppender<E> extends UnsynchronizedAppenderBase<E> {
@@ -64,6 +67,9 @@ public class FlashtoolAppender<E> extends UnsynchronizedAppenderBase<E> {
     private final static String wrapSystemErr_METHOD_NAME = "wrapSystemErr";
     private final static Class<?>[] ARGUMENT_TYPES = { PrintStream.class };
     private StyledText text = null;
+    private static final Pattern LOG_PREFIX = Pattern.compile(
+    "^(\\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2}:\\d{2})\\s+-\\s+(TRACE|DEBUG|INFO|WARN|ERROR)\\b"
+    );
     private ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
     private BufferedOutputStream boutputStream = new BufferedOutputStream(byteStream);
 
@@ -117,7 +123,7 @@ public class FlashtoolAppender<E> extends UnsynchronizedAppenderBase<E> {
 
     /**
      * The underlying output stream used by this appender.
-     * 
+     *
      * @return
      */
     public OutputStream getOutputStream() {
@@ -129,7 +135,7 @@ public class FlashtoolAppender<E> extends UnsynchronizedAppenderBase<E> {
      * activates this appender.
      */
     public void start() {
-    	
+
         OutputStream targetStream = target.getStream();
         // enable jansi only if withJansi set to true
         if (withJansi) {
@@ -167,7 +173,7 @@ public class FlashtoolAppender<E> extends UnsynchronizedAppenderBase<E> {
         }
         return targetStream;
     }
-    
+
     /**
      * @return whether to use JANSI or not.
      */
@@ -184,7 +190,7 @@ public class FlashtoolAppender<E> extends UnsynchronizedAppenderBase<E> {
     public void setWithJansi(boolean withJansi) {
         this.withJansi = withJansi;
     }
-    
+
     public void setLayout(Layout<E> layout) {
         addWarn("This appender no longer admits a layout as a sub-component, set an encoder instead.");
         addWarn("To ensure compatibility, wrapping your layout in LayoutWrappingEncoder.");
@@ -206,7 +212,7 @@ public class FlashtoolAppender<E> extends UnsynchronizedAppenderBase<E> {
 
     /**
      * Stop this appender instance. The underlying stream or writer is also closed.
-     * 
+     *
      * <p>
      * Stopped appenders cannot be reused.
      */
@@ -257,7 +263,7 @@ public class FlashtoolAppender<E> extends UnsynchronizedAppenderBase<E> {
      * <code>OutputStream</code> must be opened by the user and be writable. The
      * <code>OutputStream</code> will be closed when the appender instance is
      * closed.
-     * 
+     *
      * @param outputStream An already opened OutputStream.
      */
     public void setOutputStream(OutputStream outputStream) {
@@ -290,34 +296,85 @@ public class FlashtoolAppender<E> extends UnsynchronizedAppenderBase<E> {
         }
     }
 
+
     protected void writeOut(E event) throws IOException {
         byte[] byteArray = this.encoder.encode(event);
         writeBytes(byteArray);
-    	Display.getDefault().syncExec(new Runnable() {
-			public void run() {
-				// Append formatted message to textarea.
-				if (MyLogger.getLevel()==Level.ERROR) {
-					append(text.getDisplay().getSystemColor(SWT.COLOR_RED),new String(byteArray));
-				}
-				else if (MyLogger.getLevel()==Level.WARN) {
-					append(text.getDisplay().getSystemColor(SWT.COLOR_BLUE),new String(byteArray));
-				}
-				else {
-					append(text.getDisplay().getSystemColor(SWT.COLOR_BLACK),new String(byteArray));
-				}
-			}
-		});
+
+        // Use the actual event severity, not the global logging threshold.
+        final Level eventLevel = event instanceof ILoggingEvent
+            ? ((ILoggingEvent) event).getLevel()
+            : Level.INFO;
+
+        Display.getDefault().syncExec(() -> {
+            if (text == null || text.isDisposed()) {
+                return;
+            }
+
+            Color severityColor = text.getForeground();
+
+            if (eventLevel == Level.ERROR) {
+                severityColor = text.getDisplay()
+                        .getSystemColor(SWT.COLOR_DARK_RED);
+            } else if (eventLevel == Level.WARN) {
+                severityColor = text.getDisplay()
+                        .getSystemColor(SWT.COLOR_DARK_YELLOW);
+            } else if (eventLevel == Level.DEBUG ||
+                        eventLevel == Level.TRACE) {
+                severityColor = text.getDisplay()
+                        .getSystemColor(SWT.COLOR_DARK_GRAY);
+            }
+
+            append(severityColor, new String(byteArray));
+        });
     }
-    
-	public void append(final Color color, final String message) {
-					text.append(message);
-					StyleRange styleRange = new StyleRange();
-					styleRange.start = text.getCharCount()-message.length();
-					styleRange.length = message.length();
-					styleRange.fontStyle = SWT.NORMAL;
-					styleRange.foreground = color;
-					text.setStyleRange(styleRange);
-					text.setSelection(text.getCharCount());
+
+
+    public void append(final Color color, final String message) {
+        // Follow new messages only if the user is already at the bottom.
+        boolean followNewMessages =
+            text.getLinePixel(text.getLineCount())
+            <= text.getClientArea().height + 2;
+
+        // Preserve the visible position when the user has scrolled up.
+        int previousTopPixel = text.getTopPixel();
+
+        int start = text.getCharCount();
+
+        // Append the original log text without modifying its contents.
+        text.append(message);
+
+        Matcher matcher = LOG_PREFIX.matcher(message);
+
+        if (matcher.find()) {
+            // Display timestamps in a muted grey.
+            StyleRange timestampStyle = new StyleRange();
+            timestampStyle.start = start + matcher.start(1);
+            timestampStyle.length = matcher.end(1) - matcher.start(1);
+            timestampStyle.foreground = text.getDisplay()
+                    .getSystemColor(SWT.COLOR_DARK_GRAY);
+
+            text.setStyleRange(timestampStyle);
+
+            // Highlight only the severity label.
+            StyleRange levelStyle = new StyleRange();
+            levelStyle.start = start + matcher.start(2);
+            levelStyle.length = matcher.end(2) - matcher.start(2);
+            levelStyle.foreground = color;
+            levelStyle.fontStyle = SWT.BOLD;
+
+            text.setStyleRange(levelStyle);
+        }
+
+        // Retain existing scrolling behaviour for this first test.
+
+        if (followNewMessages) {
+            // Normal behaviour: continue following incoming messages.
+            text.setSelection(text.getCharCount());
+        } else {
+            // User is reading older messages: preserve their scroll position.
+            text.setTopPixel(previousTopPixel);
+        }
     }
 
     private void writeBytes(byte[] byteArray) throws IOException {
@@ -342,7 +399,7 @@ public class FlashtoolAppender<E> extends UnsynchronizedAppenderBase<E> {
      * <p>
      * Most subclasses of <code>WriterAppender</code> will need to override this
      * method.
-     * 
+     *
      * @since 0.9.0
      */
     protected void subAppend(E event) {
@@ -417,7 +474,7 @@ public class FlashtoolAppender<E> extends UnsynchronizedAppenderBase<E> {
 		}
     	return "";
     }
-    
+
     public void writeFile(String fname) {
     	final File file = new File(fname);
     	try {
